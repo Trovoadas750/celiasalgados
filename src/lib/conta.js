@@ -14,6 +14,8 @@ const MSG_GENERICA = "Não foi possível concluir agora. Tente novamente.";
 
 export function mensagemErroAuth(error) {
   if (!error) return null;
+  // Em desenvolvimento, mostra o erro original do Supabase no console para facilitar o diagnóstico.
+  if (process.env.NODE_ENV !== "production") console.error("[Supabase Auth]", error.status, error.code, error.message);
   const codigo = error.code ?? "";
   const texto = (error.message ?? "").toLowerCase();
 
@@ -29,6 +31,10 @@ export function mensagemErroAuth(error) {
     return "Já existe uma conta com esse telefone. Tente entrar.";
   }
   if (codigo === "weak_password") return "Senha fraca. Use pelo menos 8 caracteres.";
+  // Acontece quando "Confirm email" está ligado no Supabase: ele tenta mandar e-mail para @cliente.invalid.
+  if (codigo === "email_address_invalid" || texto.includes("confirmation email")) {
+    return "O cadastro está temporariamente indisponível. Fale com a salgadaria.";
+  }
   if (error.status === 0 || error.name === "AuthRetryableFetchError") return "Sem conexão. Confira sua internet.";
   return MSG_GENERICA;
 }

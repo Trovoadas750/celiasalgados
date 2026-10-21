@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORIAS } from "@/lib/categorias";
 import { ICONE_CATEGORIA, IconeLupa } from "@/components/icones";
 import CardProduto from "./CardProduto";
@@ -25,27 +25,70 @@ export default function Cardapio({ produtos }) {
     ),
   })).filter((s) => s.produtos.length > 0);
 
-  // Destaca a aba da seção que está passando logo abaixo das abas.
+  const barra = useRef(null); // busca + abas (fixa no topo)
+
+  // Onde a barra termina quando está grudada no topo. Antes de grudar (topo da página) ela fica
+  // mais embaixo, então a posição atual não serve para calcular o destino da rolagem.
+  function fundoDaBarraFixa() {
+    const el = barra.current;
+    return parseFloat(getComputedStyle(el).top) + el.offsetHeight;
+  }
+  const rolandoPara = useRef(null); // aba clicada, travada até a rolagem terminar
+
+  // Destaca a aba da seção que está logo abaixo da barra fixa: a última cujo topo já passou dela.
+  // A altura da barra é medida na hora, então funciona em qualquer tela e tamanho de fonte.
   useEffect(() => {
-    const observador = new IntersectionObserver(
-      (entradas) => {
-        const visivel = entradas.find((e) => e.isIntersecting);
-        if (visivel) setAtiva(visivel.target.id.replace("secao-", ""));
-      },
-      { rootMargin: "-140px 0px -65% 0px" },
-    );
-    document.querySelectorAll("[data-secao]").forEach((el) => observador.observe(el));
-    return () => observador.disconnect();
+    let quadro = 0;
+    function atualizar() {
+      quadro = 0;
+      if (rolandoPara.current) return;
+      const limite = fundoDaBarraFixa() + 8;
+      const secoesNaTela = [...document.querySelectorAll("[data-secao]")];
+      if (secoesNaTela.length === 0) return;
+      // No fim da página a última seção (curta) nunca chega na barra: considera ela a ativa.
+      const noFim = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      const atual = noFim
+        ? secoesNaTela.at(-1)
+        : secoesNaTela.findLast((s) => s.getBoundingClientRect().top <= limite) ?? secoesNaTela[0];
+      setAtiva(atual.dataset.secao);
+    }
+    function aoRolar() {
+      if (!quadro) quadro = requestAnimationFrame(atualizar);
+    }
+    function aoTerminarRolagem() {
+      rolandoPara.current = null;
+      aoRolar();
+    }
+    window.addEventListener("scroll", aoRolar, { passive: true });
+    window.addEventListener("scrollend", aoTerminarRolagem);
+    aoRolar();
+    return () => {
+      window.removeEventListener("scroll", aoRolar);
+      window.removeEventListener("scrollend", aoTerminarRolagem);
+      cancelAnimationFrame(quadro);
+    };
   }, [termo]);
 
   function irPara(id) {
+    const secao = document.getElementById(`secao-${id}`);
+    if (!secao) return;
     setAtiva(id);
-    document.getElementById(`secao-${id}`)?.scrollIntoView({ behavior: "smooth" });
+    rolandoPara.current = id;
+    // Para o título logo abaixo da barra fixa (e não escondido atrás dela).
+    const destino = window.scrollY + secao.getBoundingClientRect().top - fundoDaBarraFixa();
+    window.scrollTo({ top: Math.max(0, destino), behavior: "smooth" });
+    // Navegadores sem o evento "scrollend" (Safari antigo): destrava depois da animação.
+    setTimeout(() => {
+      if (rolandoPara.current === id) rolandoPara.current = null;
+    }, 1200);
   }
 
   return (
     <>
-      <div className="sticky top-16 z-10 -mx-3 bg-papel/95 px-3 pb-2 pt-3 backdrop-blur supports-[backdrop-filter]:bg-papel/80">
+      <div
+        ref={barra}
+        className="sticky top-16 z-10 -mx-3 bg-papel/95 px-3 pb-2 pt-3 backdrop-blur supports-[backdrop-filter]:bg-papel/80"
+      >
         <label className="flex h-11 items-center gap-2 rounded-xl bg-cartao px-3 ring-1 ring-borda focus-within:ring-2 focus-within:ring-vermelho/40">
           <IconeLupa className="size-5 text-tinta/70" />
           <input
@@ -85,7 +128,7 @@ export default function Cardapio({ produtos }) {
       )}
 
       {secoes.map(({ id, titulo, subtitulo, produtos: lista }) => (
-        <section key={id} id={`secao-${id}`} data-secao className="scroll-mt-[9.5rem] pt-5">
+        <section key={id} id={`secao-${id}`} data-secao={id} className="pt-5">
           <h2 className="font-titulo text-[22px] text-vermelho">{titulo}</h2>
           <p className="mb-3 text-[13px] text-tinta/70">{subtitulo}</p>
           <div className="grid gap-3 sm:grid-cols-2">

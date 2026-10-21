@@ -3,8 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 // Chave publishable (sb_publishable_...). NUNCA use a chave secreta aqui: este código vai para o navegador.
 // As variáveis precisam ser lidas com o nome literal para o Next embuti-las no bundle.
 const URL_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const CHAVE_SUPABASE =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const CHAVE_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabaseConfigurado = Boolean(URL_SUPABASE && CHAVE_SUPABASE);
 
