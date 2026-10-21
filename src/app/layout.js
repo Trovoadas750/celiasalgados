@@ -1,5 +1,6 @@
 import { Figtree, Young_Serif } from "next/font/google";
 import { ClienteProvider } from "@/components/cliente/ClienteProvider";
+import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import Sacola from "@/components/sacola/Sacola";
 import "./globals.css";
@@ -27,6 +28,11 @@ export const viewport = {
   themeColor: "#d0121b",
   colorScheme: "only light",
   viewportFit: "cover",
+  // Tela fixa: sem zoom de pinça nem zoom automático ao focar campos
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {
@@ -35,8 +41,8 @@ export default function RootLayout({ children }) {
       <body className="flex min-h-full flex-col">
         <ClienteProvider>
           <Header />
-          {/* pb deixa espaço para o rodapé fixo da sacola */}
-          <main className="mx-auto w-full max-w-2xl flex-1 px-3 pb-32">{children}</main>
+          <main className="mx-auto w-full max-w-2xl flex-1 px-3 pb-10">{children}</main>
+          <Footer />
           <Sacola />
         </ClienteProvider>
       </body>

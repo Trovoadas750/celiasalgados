@@ -80,4 +80,5 @@ Valores e tabelas usam `tabular-nums`.
 ## Layout
 
 - **Mobile-first:** cerca de 90% dos acessos vêm do celular. O conteúdo fica em `max-w-2xl` centralizado, com `px-3`.
-- O rodapé **Sacola** fica fixo embaixo; o `main` tem `pb-32` para não ficar escondido atrás dele.
+- A barra **Sacola** fica fixa embaixo da tela. Quem dá o espaço para ela é o **Footer** (`src/components/Footer.js`), com padding inferior extra; o `main` tem só `pb-10`.
+- **Footer:** `bg-vermelho`, logo à esquerda, ícones de redes sociais à direita e links das páginas legais (`/termos`, `/privacidade`). Os links das redes ficam em `src/lib/contato.js`.

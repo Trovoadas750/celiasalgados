@@ -159,3 +159,33 @@ export const ICONE_CATEGORIA = {
   salgado: IconeCoxinha,
   refrigerante: IconeGarrafa,
 };
+
+// Redes sociais (mesmo traço dos outros ícones)
+export function IconeInstagram(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" />
+    </Svg>
+  );
+}
+
+export function IconeWhatsapp(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3.3 20.7l1.2-4.1a8.7 8.7 0 1 1 3.1 3z" />
+      <path d="M9 8.3c-.4 2.9 3.6 7.1 6.6 6.8l.9-1.5-2.1-1.1-1 .8a5.2 5.2 0 0 1-2.7-2.7l.8-1-1.1-2.1z" />
+    </Svg>
+  );
+}
+
+export function IconeFacebook(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.8" />
+      <path d="M15 7.8h-1.5a2.3 2.3 0 0 0-2.3 2.3v10.7" />
+      <path d="M8.8 13h5.4" />
+    </Svg>
+  );
+}

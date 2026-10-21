@@ -20,10 +20,27 @@
   color-scheme: only light;
 }
 
+html {
+  /* Impede o navegador de aumentar o texto sozinho ao girar a tela */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--color-papel);
   color: var(--color-tinta);
   -webkit-tap-highlight-color: transparent;
+  /* Evita zoom com toque duplo */
+  touch-action: manipulation;
+  /* Evita o "puxar" da página para os lados */
+  overflow-x: hidden;
+}
+
+/* O iOS dá zoom ao focar campos com fonte menor que 16px */
+input,
+textarea,
+select {
+  font-size: 16px !important;
 }
 
 /* Capa: vermelho com bolinhas, lembrando a borda da logo */
