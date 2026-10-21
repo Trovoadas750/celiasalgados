@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
+/* Fundo off-white sépia, texto marrom-escuro e destaques em vermelho vivo.
+   Contrastes (WCAG): tinta/papel 14:1 · vermelho/papel 4.9:1 · branco/vermelho 5.6:1 */
+@theme {
+  --color-papel: #f5ecdc;
+  --color-cartao: #fcf7ee;
+  --color-sepia: #ead9bb;
+  --color-borda: #dcc8a6;
+  --color-tinta: #2b1d14;
+  --color-vermelho: #d0121b;
+  --color-vermelho-escuro: #a50d15;
+
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-titulo: var(--font-young-serif), Georgia, serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* "only" impede o modo escuro forçado de alguns navegadores de inverter as cores */
+  color-scheme: only light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-papel);
+  color: var(--color-tinta);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Capa: vermelho com bolinhas, lembrando a borda da logo */
+.capa {
+  background-color: var(--color-vermelho);
+  background-image:
+    radial-gradient(circle at 20% 30%, rgb(255 255 255 / 0.14) 2px, transparent 2.5px),
+    radial-gradient(circle at 70% 80%, rgb(255 255 255 / 0.08) 2px, transparent 2.5px),
+    linear-gradient(135deg, #e01a22 0%, #b20f17 100%);
+  background-size: 22px 22px, 22px 22px, 100% 100%;
+}
+
+/* Bottom sheet da sacola */
+dialog.sheet[open] {
+  animation: subir 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+dialog.sheet::backdrop {
+  backdrop-filter: blur(2px);
+}
+
+@keyframes subir {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.sheet[open] {
+    animation: none;
+  }
 }
