@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRef } from "react";
 import { formatarPreco } from "@/lib/formatar";
 import { ICONE_CATEGORIA, IconeFechar, IconeMais, IconeMenos } from "@/components/icones";
@@ -14,6 +16,10 @@ export default function Sacola() {
   const { itens, total, quantidade } = useSacola();
   const dialogo = useRef(null);
   const vazia = itens.length === 0;
+  const pathname = usePathname();
+
+  // No checkout a própria página mostra os itens e o total.
+  if (pathname === "/checkout") return null;
 
   return (
     <>
@@ -138,13 +144,14 @@ export default function Sacola() {
                   >
                     Limpar
                   </button>
-                  <button
-                    type="button"
-                    className="flex h-12 flex-1 items-center justify-between rounded-xl bg-vermelho px-4 text-sm font-bold text-white"
+                  <Link
+                    href="/checkout"
+                    onClick={() => dialogo.current.close()}
+                    className="flex h-12 flex-1 items-center justify-between rounded-xl bg-vermelho px-4 text-sm font-bold text-white hover:bg-vermelho-escuro"
                   >
                     <span>Continuar pedido</span>
                     <span className="tabular-nums">{formatarPreco(total)}</span>
-                  </button>
+                  </Link>
                 </div>
               </footer>
             </>

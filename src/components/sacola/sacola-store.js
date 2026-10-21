@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 // Sacola guardada no navegador. Cada item: { produto, quantidade }.
 // O preço salvo aqui é só para exibir; o banco recalcula tudo em `criar_pedido`.
 
-const CHAVE = "celiasalgados:sacola";
+const CHAVE = "celiasalgados:sacola:v2"; // v1 guardava produtos de exemplo (mock)
 const VAZIA = [];
 const ouvintes = new Set();
 let itens = null;

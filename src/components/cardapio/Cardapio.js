@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CATEGORIAS } from "@/lib/mock";
+import { CATEGORIAS } from "@/lib/categorias";
 import { ICONE_CATEGORIA, IconeLupa } from "@/components/icones";
 import CardProduto from "./CardProduto";
 
@@ -11,10 +11,12 @@ function normalizar(texto) {
 
 export default function Cardapio({ produtos }) {
   const [busca, setBusca] = useState("");
-  const [ativa, setAtiva] = useState(CATEGORIAS[0].id);
+  // Abas só para categorias que têm produto ativo.
+  const categorias = CATEGORIAS.filter((c) => produtos.some((p) => p.categoria === c.id));
+  const [ativa, setAtiva] = useState(categorias[0]?.id);
 
   const termo = normalizar(busca.trim());
-  const secoes = CATEGORIAS.map((categoria) => ({
+  const secoes = categorias.map((categoria) => ({
     ...categoria,
     produtos: produtos.filter(
       (p) =>
@@ -56,7 +58,7 @@ export default function Cardapio({ produtos }) {
         </label>
 
         <nav className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none]" aria-label="Categorias">
-          {CATEGORIAS.map(({ id, titulo }) => {
+          {categorias.map(({ id, titulo }) => {
             const Icone = ICONE_CATEGORIA[id];
             const selecionada = ativa === id;
             return (
@@ -78,7 +80,7 @@ export default function Cardapio({ produtos }) {
 
       {secoes.length === 0 && (
         <p className="py-16 text-center text-sm text-tinta/70">
-          Nada encontrado para “{busca}”.
+          {termo ? <>Nada encontrado para “{busca}”.</> : "Nenhum produto disponível no momento."}
         </p>
       )}
 
