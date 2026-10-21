@@ -1,15 +1,8 @@
 import Image from "next/image";
 import Cardapio from "@/components/cardapio/Cardapio";
-import { buscarCardapio } from "@/lib/cardapio";
+import { PRODUTOS } from "@/lib/cardapio";
 
-const AVISOS = {
-  sem_configuracao: "O cardápio ainda não está conectado ao banco de dados.",
-  falha: "Não foi possível carregar o cardápio agora. Tente de novo em instantes.",
-};
-
-export default async function MenuPage() {
-  const { produtos, erro } = await buscarCardapio();
-
+export default function MenuPage() {
   return (
     <>
       {/* Capa da loja, no estilo das lojas Saipos */}
@@ -29,13 +22,7 @@ export default async function MenuPage() {
         </div>
       </section>
 
-      {erro ? (
-        <p role="alert" className="mt-6 rounded-xl bg-vermelho/10 px-3 py-3 text-sm font-medium text-vermelho-escuro">
-          {AVISOS[erro]}
-        </p>
-      ) : (
-        <Cardapio produtos={produtos} />
-      )}
+      <Cardapio produtos={PRODUTOS} />
     </>
   );
 }

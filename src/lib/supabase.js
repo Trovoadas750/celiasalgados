@@ -19,11 +19,3 @@ export function getSupabase() {
   clienteNavegador ??= createClient(URL_SUPABASE, CHAVE_SUPABASE);
   return clienteNavegador;
 }
-
-// Cliente sem sessão, para leituras públicas feitas no servidor (cardápio).
-export function criarSupabasePublico() {
-  if (!supabaseConfigurado) return null;
-  return createClient(URL_SUPABASE, CHAVE_SUPABASE, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-}
