@@ -1,41 +1,77 @@
 "use client";
 
 import Campo from "@/components/cliente/Campo";
+import { IconeAlerta } from "@/components/icones";
 
-const DIA = 24 * 60 * 60 * 1000;
+// Agendamento do pedido. Datas no horário de Brasília (o banco compara a data em Brasília).
 
-// "2026-10-21T15:30" no fuso do navegador, formato do <input type="datetime-local">
-function paraInputLocal(data) {
-  const ajustada = new Date(data.getTime() - data.getTimezoneOffset() * 60000);
-  return ajustada.toISOString().slice(0, 16);
+const FUSO = "America/Sao_Paulo";
+const MAX_DIAS = 90;
+
+/** "2026-10-21" (hoje em Brasília). Chame fora do render (ex.: useState(hojeEmBrasilia)). */
+export function hojeEmBrasilia() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(new Date());
 }
 
-// O banco aceita agendamento no futuro e até 90 dias.
-export function limitesAgendamento(agora = new Date()) {
-  return { min: paraInputLocal(new Date(agora.getTime() + 60 * 60 * 1000)), max: paraInputLocal(new Date(agora.getTime() + 90 * DIA)) };
+export function somarDias(dataIso, dias) {
+  const [a, m, d] = dataIso.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
 }
 
-export function validarEntrega({ tipo, quando }) {
-  if (tipo !== "agendar") return {};
-  if (!quando) return { quando: "Escolha o dia e o horário da encomenda." };
-  const data = new Date(quando);
-  const agora = Date.now();
-  if (Number.isNaN(data.getTime()) || data.getTime() <= agora) return { quando: "Escolha um horário no futuro." };
-  if (data.getTime() > agora + 90 * DIA) return { quando: "Encomendas podem ser feitas para até 90 dias." };
-  return {};
+/** "2026-10-22" -> "22/10/2026" */
+export function formatarData(dataIso) {
+  const [a, m, d] = dataIso.split("-");
+  return `${d}/${m}/${a}`;
 }
 
-// ISO para `p_agendado_para`, ou null = o quanto antes.
-export function agendadoPara({ tipo, quando }) {
-  return tipo === "agendar" && quando ? new Date(quando).toISOString() : null;
+/** ISO com o fuso de Brasília, como o banco espera em p_agendado_para. */
+export function paraIso(data, hora) {
+  return `${data}T${hora}:00-03:00`;
 }
 
-function OpcaoRadio({ nome, valor, atual, onChange, titulo, texto }) {
+/**
+ * Datas permitidas no seletor.
+ * - Com assado pronto (exige_agendamento): mínimo = data_minima_agendamento do banco.
+ * - "Agendar para outro dia": a partir de amanhã.
+ */
+export function limitesData(resumo, hoje) {
+  const amanha = somarDias(hoje, 1);
+  const min = resumo?.exige_agendamento ? resumo.data_minima_agendamento ?? amanha : amanha;
+  return { min, max: somarDias(hoje, MAX_DIAS) };
+}
+
+function deveAgendar(valores, exige) {
+  return exige || valores.tipo === "agendar";
+}
+
+export function validarAgendamento(valores, exige, limites) {
+  if (!deveAgendar(valores, exige)) return {};
+  const erros = {};
+  if (!valores.data) erros.data = exige ? "Escolha a data da encomenda." : "Escolha o dia.";
+  else if (valores.data < limites.min) erros.data = `Escolha uma data a partir de ${formatarData(limites.min)}.`;
+  else if (valores.data > limites.max) erros.data = `Agendamentos podem ser feitos para até ${MAX_DIAS} dias.`;
+  if (!valores.hora) erros.hora = "Escolha o horário.";
+  if (!erros.data && !erros.hora && new Date(paraIso(valores.data, valores.hora)).getTime() <= Date.now()) {
+    erros.hora = "Escolha um horário no futuro.";
+  }
+  return erros;
+}
+
+/** Valor de p_agendado_para: ISO -03:00, ou null = o quanto antes. */
+export function agendadoPara(valores, exige) {
+  return deveAgendar(valores, exige) && valores.data && valores.hora ? paraIso(valores.data, valores.hora) : null;
+}
+
+export function OpcaoRadio({ nome, valor, atual, onChange, titulo, texto, desabilitado = false }) {
   const marcado = atual === valor;
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 ring-1 transition ${
-        marcado ? "bg-vermelho/5 ring-2 ring-vermelho" : "bg-cartao ring-borda"
+      className={`flex items-start gap-3 rounded-xl p-3 transition ${
+        desabilitado
+          ? "cursor-not-allowed bg-superficie text-desabilitado ring-1 ring-borda-suave"
+          : marcado
+            ? "cursor-pointer bg-superficie ring-2 ring-ferrugem"
+            : "cursor-pointer bg-superficie ring-1 ring-borda-suave hover:ring-borda-input"
       }`}
     >
       <input
@@ -43,24 +79,67 @@ function OpcaoRadio({ nome, valor, atual, onChange, titulo, texto }) {
         name={nome}
         value={valor}
         checked={marcado}
+        disabled={desabilitado}
         onChange={() => onChange(valor)}
-        className="mt-1 size-4 accent-[var(--color-vermelho)]"
+        className="radio mt-0.5"
       />
       <span>
         <span className="block font-bold">{titulo}</span>
-        {texto && <span className="block text-[13px] text-tinta/70">{texto}</span>}
+        {texto && <span className={`block text-sm ${desabilitado ? "" : "text-texto-suave"}`}>{texto}</span>}
       </span>
     </label>
   );
 }
 
-export { OpcaoRadio };
+function CamposDataHora({ valores, setValores, erros, limites, exige }) {
+  return (
+    <div className="grid grid-cols-[1fr_8rem] gap-3">
+      <Campo
+        rotulo={exige ? "Data da encomenda" : "Dia"}
+        type="date"
+        required
+        min={limites.min}
+        max={limites.max}
+        value={valores.data}
+        onChange={(e) => setValores({ ...valores, data: e.target.value })}
+        erro={erros.data}
+      />
+      <Campo
+        rotulo="Horário"
+        type="time"
+        required
+        value={valores.hora}
+        onChange={(e) => setValores({ ...valores, hora: e.target.value })}
+        erro={erros.hora}
+      />
+    </div>
+  );
+}
 
-export default function BlocoEntrega({ valores, setValores, erros, limites }) {
+/**
+ * `exige` = resumo.exige_agendamento (há assado pronto): data obrigatória a partir de
+ * resumo.data_minima_agendamento. Senão: "O quanto antes" (padrão) ou "Agendar para outro dia".
+ */
+export default function BlocoEntrega({ valores, setValores, erros, limites, exige, comEntrega }) {
+  if (exige) {
+    return (
+      <div className="space-y-3">
+        <p className="flex items-start gap-2 rounded-xl bg-aviso-fundo px-3 py-2.5 text-sm font-medium text-aviso-texto">
+          <IconeAlerta className="mt-px size-5 shrink-0" />
+          <span>
+            Pedidos com assados prontos precisam de 1 dia de antecedência. Escolha uma data a partir de{" "}
+            <strong>{formatarData(limites.min)}</strong>.
+          </span>
+        </p>
+        <CamposDataHora valores={valores} setValores={setValores} erros={erros} limites={limites} exige />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <OpcaoRadio
-        nome="entrega"
+        nome="quando"
         valor="agora"
         atual={valores.tipo}
         onChange={(tipo) => setValores({ ...valores, tipo })}
@@ -68,24 +147,17 @@ export default function BlocoEntrega({ valores, setValores, erros, limites }) {
         texto="Preparamos assim que o pedido chegar."
       />
       <OpcaoRadio
-        nome="entrega"
+        nome="quando"
         valor="agendar"
         atual={valores.tipo}
         onChange={(tipo) => setValores({ ...valores, tipo })}
-        titulo="Agendar encomenda"
-        texto="Para festas e eventos, até 90 dias antes."
+        titulo="Agendar para outro dia"
+        texto={comEntrega ? "Escolha o dia e o horário da entrega." : "Escolha o dia e o horário da retirada."}
       />
       {valores.tipo === "agendar" && (
-        <Campo
-          rotulo="Dia e horário"
-          type="datetime-local"
-          min={limites.min}
-          max={limites.max}
-          value={valores.quando}
-          onChange={(e) => setValores({ ...valores, quando: e.target.value })}
-          erro={erros.quando}
-          className="pt-1"
-        />
+        <div className="pt-1">
+          <CamposDataHora valores={valores} setValores={setValores} erros={erros} limites={limites} />
+        </div>
       )}
     </div>
   );

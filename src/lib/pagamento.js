@@ -1,12 +1,13 @@
 // Estrutura de pagamento. A integração com gateway (Pix online, cartão online) ainda não existe:
 // hoje o pedido só registra a forma escolhida em `pedidos.forma_pagamento` e o pagamento é
-// combinado na entrega. Quando o gateway entrar, a chamada vai em `iniciarPagamento`.
+// combinado na entrega ou na retirada. Quando o gateway entrar, a chamada vai em `iniciarPagamento`.
 
 // Valores aceitos pela coluna `pedidos.forma_pagamento`.
+// `detalhe` recebe o momento do pagamento: "na entrega" ou "na retirada".
 export const FORMAS_PAGAMENTO = [
-  { id: "pix", rotulo: "Pix", detalhe: "Pague com Pix" },
-  { id: "dinheiro", rotulo: "Dinheiro", detalhe: "Na entrega · informe se precisa de troco" },
-  { id: "cartao", rotulo: "Cartão", detalhe: "Crédito ou débito na entrega" },
+  { id: "pix", rotulo: "Pix", detalhe: () => "Pague com Pix" },
+  { id: "dinheiro", rotulo: "Dinheiro", detalhe: (momento) => `Pague ${momento} · informe se precisa de troco` },
+  { id: "cartao", rotulo: "Cartão", detalhe: (momento) => `Crédito ou débito ${momento}` },
 ];
 
 /**

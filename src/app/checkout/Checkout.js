@@ -2,27 +2,32 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertaErro } from "@/components/cliente/Campo";
-import { useCliente } from "@/components/cliente/ClienteProvider";
-import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
-import BlocoEntrega, { agendadoPara, limitesAgendamento, validarEntrega } from "@/components/checkout/BlocoEntrega";
+import BlocoEntrega, { agendadoPara, hojeEmBrasilia, limitesData, validarAgendamento } from "@/components/checkout/BlocoEntrega";
 import BlocoIdentificacao from "@/components/checkout/BlocoIdentificacao";
 import BlocoPagamento, { lerValor, validarPagamento } from "@/components/checkout/BlocoPagamento";
-import FormEndereco, { ENDERECO_VAZIO } from "@/components/checkout/FormEndereco";
+import BlocoRecebimento from "@/components/checkout/BlocoRecebimento";
+import { ENDERECO_VAZIO } from "@/components/checkout/FormEndereco";
 import PedidoConfirmado from "@/components/checkout/PedidoConfirmado";
-import Campo from "@/components/cliente/Campo";
-import { esvaziar, useSacola } from "@/components/sacola/sacola-store";
+import { useFrete } from "@/components/checkout/ResumoFrete";
+import Campo, { AlertaErro } from "@/components/cliente/Campo";
+import { useCliente } from "@/components/cliente/ClienteProvider";
+import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
+import { IconeMotoboy, IconeRetirada } from "@/components/icones";
+import { esvaziar, itensParaPedido, juntarObservacoes, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
+import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
-import { formatarPreco } from "@/lib/formatar";
+import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
+import { formatarPreco, MODO_PACOTE } from "@/lib/formatar";
+import { LOJA } from "@/lib/loja";
 import { iniciarPagamento } from "@/lib/pagamento";
-import { enviarPedido, montarItens } from "@/lib/pedidos";
+import { criarPedido } from "@/lib/pedidos";
 import { mascararTelefone, soDigitos, temErros, validar } from "@/lib/validacao";
 
 function Secao({ numero, titulo, children }) {
   return (
     <section className="pt-6">
-      <h2 className="mb-3 flex items-center gap-2 font-titulo text-xl text-vermelho">
-        <span className="grid size-7 place-items-center rounded-full bg-vermelho font-sans text-sm font-bold text-white">
+      <h2 className="mb-3 flex items-center gap-2 font-titulo text-xl text-ferrugem-hover">
+        <span className="grid size-7 place-items-center rounded-full bg-ferrugem font-sans text-sm font-bold text-white">
           {numero}
         </span>
         {titulo}
@@ -40,9 +45,39 @@ function focarPrimeiroErro() {
   });
 }
 
+function Valor({ valor, calculando, className = "" }) {
+  if (calculando) return <span className={`text-texto-suave ${className}`}>…</span>;
+  if (valor === undefined || valor === null) return <span className={`text-texto-suave ${className}`}>—</span>;
+  return <span className={`tabular-nums ${className}`}>{formatarPreco(valor)}</span>;
+}
+
+// Itens do carrinho; o subtotal de cada linha vem do calcularPedido (mesma ordem dos itens).
+function ResumoSacola({ itens, resumo, calculando }) {
+  return (
+    <ul className="divide-y divide-borda-suave rounded-2xl bg-superficie px-4 ring-1 ring-borda-suave">
+      {itens.map((item, i) => (
+        <li key={item.chave} className="flex justify-between gap-3 py-2.5 text-sm">
+          <div className="min-w-0">
+            <p>
+              <span className="font-semibold tabular-nums">{item.quantidade}x</span> {item.nome}
+            </p>
+            {item.modo && (
+              <p className="text-texto-suave">
+                {MODO_PACOTE[item.modo]} · {item.quantidade > 1 ? "cada: " : ""}
+                {item.sabores.map((s) => `${s.quantidade / item.quantidade} ${s.nome}`).join(", ")}
+              </p>
+            )}
+          </div>
+          <Valor valor={resumo?.itens[i]?.subtotal} calculando={calculando} className="shrink-0" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // Montado só no navegador, depois que o useCliente terminou de carregar:
 // por isso os valores iniciais podem vir do localStorage sem quebrar a hidratação.
-function FormularioCheckout({ itens, total, aoConfirmar }) {
+function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirmar }) {
   const cliente = useCliente();
   const logado = cliente.estado === "logado";
 
@@ -56,21 +91,67 @@ function FormularioCheckout({ itens, total, aoConfirmar }) {
     const salvo = lerUltimoEndereco() ?? {};
     return Object.fromEntries(Object.keys(ENDERECO_VAZIO).map((campo) => [campo, String(salvo[campo] ?? "")]));
   });
-  const [entrega, setEntrega] = useState({ tipo: "agora", quando: "" });
-  const [limites] = useState(() => limitesAgendamento());
+  // Entrega x retirada: escolha obrigatória, nada vem marcado.
+  const [recebimento, setRecebimento] = useState(null);
+  const [trocadoAuto, setTrocadoAuto] = useState(false);
+  const [quando, setQuando] = useState({ tipo: "agora", data: "", hora: "" });
+  const [hoje] = useState(hojeEmBrasilia);
   const [pagamento, setPagamento] = useState({ forma: "", troco: "" });
   const [observacao, setObservacao] = useState("");
   const [erros, setErros] = useState({});
   const [erroGeral, setErroGeral] = useState(null);
   const [enviando, setEnviando] = useState(false);
 
+  // Regras que vêm do banco (calcular_pedido). Enquanto não há resumo, nada é bloqueado à toa.
+  const entregaPermitida = resumo ? resumo.entrega_permitida : true;
+  const exigeAgendamento = Boolean(resumo?.exige_agendamento);
+  const limites = limitesData(resumo, hoje);
+
+  // Entrega não permitida (mais de 100 salgados): marca retirada sozinho e avisa.
+  if (resumo && !resumo.entrega_permitida && recebimento !== "retirada") {
+    setRecebimento("retirada");
+    setTrocadoAuto(true);
+  }
+
+  const comEntrega = recebimento === "entrega";
+  const frete = useFrete(comEntrega, endereco);
+
+  // Ao mudar um campo, some o erro só daquele campo (os outros continuam até serem corrigidos).
+  function semErroAoMudar(atual, setValor) {
+    return (novo) => {
+      setValor(novo);
+      const mudaram = Object.keys(novo).filter((campo) => novo[campo] !== atual[campo]);
+      if (mudaram.some((campo) => erros[campo])) {
+        setErros((e) => Object.fromEntries(Object.entries(e).filter(([campo]) => !mudaram.includes(campo))));
+      }
+    };
+  }
+
+  function escolherRecebimento(tipo) {
+    setRecebimento(tipo);
+    setTrocadoAuto(false);
+    if (erros.recebimento) setErros(({ recebimento: _r, ...resto }) => resto);
+  }
+
+  // O banco tem uma observação por pedido: junta as dos pacotes (uma por linha) com a geral.
+  const observacaoFinal = juntarObservacoes(itens, observacao);
+  function validarObservacaoTotal() {
+    if (observacaoFinal.length <= LIMITE_OBSERVACAO) return {};
+    return {
+      observacao: `As observações juntas (pacotes + esta) têm ${observacaoFinal.length} caracteres; o máximo é ${LIMITE_OBSERVACAO}. Encurte alguma delas.`,
+    };
+  }
+
   function validarTudo() {
     const novos = {
-      ...validar(endereco, ["rua", "vila", "numero", "ponto_referencia"]),
-      ...validarEntrega(entrega),
-      ...validarPagamento(pagamento, total),
+      ...(comEntrega ? validar(endereco, ["rua", "vila", "numero", "ponto_referencia"]) : {}),
+      ...validarAgendamento(quando, exigeAgendamento, limites),
+      ...validarPagamento(pagamento, resumo?.total ?? 0),
       ...validar({ observacao }, ["observacao"]),
+      ...validarObservacaoTotal(),
     };
+    if (!recebimento) novos.recebimento = "Escolha entrega ou retirada no local.";
+    if (comEntrega && frete?.status === "fora_da_area") novos.rua = "Ainda não entregamos nesse endereço.";
     if (!logado) {
       if (modo === "convidado") Object.assign(novos, validar(convidado, ["nome", "sobrenome", "telefone"]));
       else if (modo === "conta") novos.modo = "Entre ou crie sua conta para continuar (ou siga como convidado).";
@@ -81,7 +162,7 @@ function FormularioCheckout({ itens, total, aoConfirmar }) {
 
   async function finalizar(e) {
     e.preventDefault();
-    if (enviando) return; // evita pedido duplicado
+    if (enviando || !resumo || calculando) return; // evita pedido duplicado ou sem valores do banco
     const novos = validarTudo();
     setErros(novos);
     setErroGeral(null);
@@ -91,23 +172,26 @@ function FormularioCheckout({ itens, total, aoConfirmar }) {
     }
 
     setEnviando(true);
-    const dadosCliente = logado ? cliente.dados : convidado;
-    const { pedido, erro } = await enviarPedido({
-      cliente: dadosCliente,
-      endereco,
-      entrega: { agendado_para: agendadoPara(entrega) },
-      pagamento: { forma: pagamento.forma, troco_para: lerValor(pagamento.troco) },
-      observacao,
-      itens: montarItens(itens),
-    });
-
-    if (erro) {
+    const dataAgendada = agendadoPara(quando, exigeAgendamento);
+    let pedido;
+    try {
+      pedido = await criarPedido({
+        cliente: logado ? cliente.dados : convidado,
+        tipoEntrega: recebimento,
+        endereco: comEntrega ? endereco : null,
+        itens: itensParaPedido(itens),
+        agendadoPara: dataAgendada,
+        formaPagamento: pagamento.forma,
+        trocoPara: pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
+        observacao: observacaoFinal,
+      });
+    } catch (erro) {
       setEnviando(false);
-      setErroGeral(erro);
+      setErroGeral(erro.message); // P0001 já vem em português
       return;
     }
 
-    salvarUltimoEndereco(endereco);
+    if (comEntrega) salvarUltimoEndereco(endereco);
     if (!logado) {
       cliente.salvarConvidado({
         nome: convidado.nome.trim(),
@@ -115,41 +199,70 @@ function FormularioCheckout({ itens, total, aoConfirmar }) {
         telefone: soDigitos(convidado.telefone),
       });
     }
-    const pagamentoIniciado = await iniciarPagamento({ ...pedido, forma: pagamento.forma });
+    await iniciarPagamento({ ...pedido, forma: pagamento.forma });
     // Confirma antes de esvaziar: a tela de sucesso não pode cair no estado "sacola vazia".
     aoConfirmar({
       ...pedido,
+      tipoEntrega: recebimento,
+      agendadoPara: dataAgendada,
       forma: pagamento.forma,
-      agendado_para: agendadoPara(entrega),
+      endereco: comEntrega ? endereco : null,
       comoConvidado: !logado,
-      pagamento: pagamentoIniciado,
     });
     esvaziar();
   }
+
+  const podeEnviar = !enviando && !calculando && Boolean(resumo) && !erroCalculo;
 
   return (
     <form onSubmit={finalizar} noValidate>
       <Secao numero={1} titulo="Seus dados">
         <BlocoIdentificacao
           modo={modo}
-          setModo={setModo}
+          setModo={(novo) => {
+            setModo(novo);
+            if (erros.modo) setErros(({ modo: _modo, ...resto }) => resto);
+          }}
           valores={convidado}
-          setValores={setConvidado}
+          setValores={semErroAoMudar(convidado, setConvidado)}
           erros={erros}
           erroModo={erros.modo}
         />
       </Secao>
 
-      <Secao numero={2} titulo="Endereço de entrega">
-        <FormEndereco valores={endereco} setValores={setEndereco} erros={erros} />
+      <Secao numero={2} titulo="Entrega ou retirada?">
+        <BlocoRecebimento
+          tipo={recebimento}
+          setTipo={escolherRecebimento}
+          endereco={endereco}
+          setEndereco={semErroAoMudar(endereco, setEndereco)}
+          erros={erros}
+          frete={frete}
+          entregaPermitida={entregaPermitida}
+          totalSalgados={resumo?.total_salgados}
+          limiteEntrega={resumo?.limite_entrega ?? LOJA.limiteEntrega}
+          trocadoAutomaticamente={trocadoAuto}
+        />
       </Secao>
 
-      <Secao numero={3} titulo="Quando entregar">
-        <BlocoEntrega valores={entrega} setValores={setEntrega} erros={erros} limites={limites} />
+      <Secao numero={3} titulo={comEntrega ? "Quando entregar" : recebimento === "retirada" ? "Quando retirar" : "Quando"}>
+        <BlocoEntrega
+          valores={quando}
+          setValores={semErroAoMudar(quando, setQuando)}
+          erros={erros}
+          limites={limites}
+          exige={exigeAgendamento}
+          comEntrega={comEntrega}
+        />
       </Secao>
 
       <Secao numero={4} titulo="Pagamento">
-        <BlocoPagamento valores={pagamento} setValores={setPagamento} erros={erros} />
+        <BlocoPagamento
+          valores={pagamento}
+          setValores={semErroAoMudar(pagamento, setPagamento)}
+          erros={erros}
+          momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
+        />
       </Secao>
 
       <Secao numero={5} titulo="Observação">
@@ -158,47 +271,84 @@ function FormularioCheckout({ itens, total, aoConfirmar }) {
           opcional
           textarea
           maxLength={500}
-          placeholder="Ex.: sem cebola no kibe, tocar o interfone 2"
+          placeholder="Ex.: tocar o interfone 2"
           value={observacao}
-          onChange={(e) => setObservacao(e.target.value)}
+          onChange={(e) => semErroAoMudar({ observacao }, ({ observacao: o }) => setObservacao(o))({ observacao: e.target.value })}
           erro={erros.observacao}
-          dica={`${observacao.length}/500`}
+          dica={
+            observacaoFinal.length > observacao.trim().length
+              ? `${observacaoFinal.length}/${LIMITE_OBSERVACAO} (somando as observações dos pacotes)`
+              : `${observacao.length}/${LIMITE_OBSERVACAO}`
+          }
         />
       </Secao>
 
-      <div className="mt-6 space-y-3 rounded-2xl bg-cartao p-4 ring-1 ring-borda">
-        <div className="flex items-baseline justify-between">
-          <span className="text-sm text-tinta/70">Total dos itens</span>
-          <span className="text-xl font-bold text-vermelho tabular-nums">{formatarPreco(total)}</span>
+      <div className="mt-6 space-y-3 rounded-2xl bg-superficie p-4 ring-1 ring-borda-suave">
+        {/* Repete a forma de recebimento logo acima do botão: última chance de perceber a escolha */}
+        {recebimento && (
+          <div className="flex items-center gap-3 rounded-xl bg-fundo p-2.5">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ferrugem text-white">
+              {comEntrega ? <IconeMotoboy className="size-6" /> : <IconeRetirada className="size-6" />}
+            </span>
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-bold">{TIPOS_RECEBIMENTO[recebimento].titulo}</p>
+              <p className="truncate text-sm text-texto-suave">
+                {comEntrega
+                  ? endereco.rua
+                    ? `${endereco.rua}, ${endereco.numero || "s/n"} - ${endereco.vila}`
+                    : "Endereço ainda não preenchido"
+                  : LOJA.enderecoRetirada}
+              </p>
+            </div>
+            {entregaPermitida && (
+              <button
+                type="button"
+                onClick={() => escolherRecebimento(comEntrega ? "retirada" : "entrega")}
+                className="shrink-0 text-sm font-bold text-link underline underline-offset-4 hover:text-ferrugem-ativo"
+              >
+                Trocar
+              </button>
+            )}
+          </div>
+        )}
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-texto-suave">Itens</span>
+            <Valor valor={resumo?.total} calculando={calculando} />
+          </div>
+          {recebimento && (
+            <div className="flex justify-between">
+              <span className="text-texto-suave">{comEntrega ? "Taxa de entrega" : "Retirada"}</span>
+              <span>{comEntrega ? "A combinar" : "Grátis"}</span>
+            </div>
+          )}
         </div>
-        <p className="text-[13px] text-tinta/70">O valor final é confirmado pela salgadaria ao receber o pedido.</p>
+        <div className="flex items-baseline justify-between border-t border-borda-suave pt-2">
+          <span className="text-sm font-bold">Total</span>
+          <Valor valor={resumo?.total} calculando={calculando} className="text-xl font-bold text-ferrugem" />
+        </div>
+        {comEntrega && <p className="text-sm text-texto-suave">A taxa de entrega é combinada pela salgadaria.</p>}
+        {erroCalculo && <AlertaErro>{erroCalculo}</AlertaErro>}
         <AlertaErro>{erroGeral}</AlertaErro>
-        <button type="submit" disabled={enviando} className={CLASSE_BOTAO_PRINCIPAL}>
-          {enviando ? "Enviando pedido…" : "Fazer pedido"}
+        <button type="submit" disabled={!podeEnviar} className={CLASSE_BOTAO_PRINCIPAL}>
+          {enviando
+            ? "Enviando pedido…"
+            : comEntrega
+              ? "Fazer pedido · entrega"
+              : recebimento === "retirada"
+                ? "Fazer pedido · retirar no local"
+                : "Fazer pedido"}
         </button>
       </div>
     </form>
   );
 }
 
-function ResumoSacola({ itens }) {
-  return (
-    <ul className="divide-y divide-borda rounded-2xl bg-cartao px-4 ring-1 ring-borda">
-      {itens.map(({ produto, quantidade }) => (
-        <li key={produto.id} className="flex justify-between gap-3 py-2.5 text-sm">
-          <span>
-            <span className="font-semibold tabular-nums">{quantidade}x</span> {produto.nome}
-          </span>
-          <span className="tabular-nums text-tinta/70">{formatarPreco(produto.preco * quantidade)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export default function Checkout() {
   const { estado } = useCliente();
-  const { itens, total } = useSacola();
+  const { itens } = useSacola();
+  // Total, subtotais e regras (entrega permitida, agendamento) vêm só do banco.
+  const { resumo, erro, calculando } = useCalcularPedido(itensParaPedido(itens));
   const [confirmado, setConfirmado] = useState(null);
   // Mostra o esqueleto só no primeiro carregamento; um login no meio do checkout não apaga o que foi digitado.
   const [pronto, setPronto] = useState(false);
@@ -209,10 +359,10 @@ export default function Checkout() {
   if (itens.length === 0) {
     return (
       <div className="pt-12 text-center">
-        <h1 className="font-titulo text-[26px] text-vermelho">Sua sacola está vazia</h1>
-        <p className="mt-1 text-sm text-tinta/70">Escolha seus salgados no menu para fazer um pedido.</p>
+        <h1 className="font-titulo text-[26px] text-ferrugem">Sua sacola está vazia</h1>
+        <p className="mt-1 text-sm text-texto-suave">Monte um pacote no cardápio para fazer um pedido.</p>
         <Link href="/" className={`${CLASSE_BOTAO_PRINCIPAL} mx-auto mt-5 max-w-56`}>
-          Ver o menu
+          Ver o cardápio
         </Link>
       </div>
     );
@@ -220,21 +370,21 @@ export default function Checkout() {
 
   return (
     <div className="pt-5">
-      <h1 className="font-titulo text-[28px] leading-tight text-vermelho">Finalizar pedido</h1>
+      <h1 className="font-titulo text-[28px] leading-tight text-ferrugem">Finalizar pedido</h1>
       <div className="mb-2 mt-3 flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-tinta/70">Seu pedido</h2>
-        <Link href="/" className="text-sm font-semibold text-vermelho">
-          Adicionar itens
+        <h2 className="text-sm font-bold uppercase tracking-wide text-texto-suave">Seu pedido</h2>
+        <Link href="/" className="text-sm font-semibold text-link underline underline-offset-4 hover:text-ferrugem-ativo">
+          Alterar itens
         </Link>
       </div>
-      <ResumoSacola itens={itens} />
+      <ResumoSacola itens={itens} resumo={resumo} calculando={calculando} />
 
       {pronto ? (
-        <FormularioCheckout itens={itens} total={total} aoConfirmar={setConfirmado} />
+        <FormularioCheckout itens={itens} resumo={resumo} calculando={calculando} erroCalculo={erro} aoConfirmar={setConfirmado} />
       ) : (
         <div className="mt-6 space-y-3" aria-busy="true">
-          <div className="h-24 animate-pulse rounded-xl bg-sepia/60" />
-          <div className="h-48 animate-pulse rounded-xl bg-sepia/60" />
+          <div className="h-24 animate-pulse rounded-xl bg-borda-suave" />
+          <div className="h-48 animate-pulse rounded-xl bg-borda-suave" />
         </div>
       )}
     </div>

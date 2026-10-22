@@ -1,23 +1,92 @@
 @import "tailwindcss";
 
-/* Fundo off-white sépia, texto marrom-escuro e destaques em vermelho vivo.
-   Contrastes (WCAG): tinta/papel 14:1 · vermelho/papel 4.9:1 · branco/vermelho 5.6:1 */
-@theme {
-  --color-papel: #f5ecdc;
-  --color-cartao: #fcf7ee;
-  --color-sepia: #ead9bb;
-  --color-borda: #dcc8a6;
-  --color-tinta: #2b1d14;
-  --color-vermelho: #d0121b;
-  --color-vermelho-escuro: #a50d15;
+/* ==========================================================================
+   Cores: ÚNICA fonte é o paletas.md (seção 4). Não crie cores fora desta lista.
+   ========================================================================== */
+:root {
+  /* base */
+  --creme: #F2DBC9;
+  --ferrugem: #A44A2F;
+  --laranja: #FE914E;
+  --cobre: #BC6E40;
+  --cafe: #251C14;
+  --preto: #000000;
+
+  /* apoio */
+  --creme-claro: #FAF0E8;
+  --borda-suave: #E3C4AC;
+  --borda-input: #8C6A55;
+  --texto-sec: #5C4636;
+  --ferrugem-hover: #8A3D26;
+  --ferrugem-ativo: #743320;
+  --laranja-hover: #F57C33;
+  --cobre-esc: #8F5230;
+  --desabilitado: #9C8676;
+
+  /* feedback */
+  --erro: #9F1D1D;        --erro-fundo: #FBE3DF;
+  --sucesso: #2E6B3A;     --sucesso-fundo: #E2F0DF;
+  --aviso-texto: #7A3E0E; --aviso-fundo: #FFE7CC;
+  --info: #2C5A7A;        --info-fundo: #E1ECF4;
+
+  /* fundo do selo "Cancelado" (paletas.md, seção 5, tabela de status) */
+  --cancelado-fundo: #E6DDD6;
+
+  /* papéis semânticos (use ESTES nos componentes) */
+  --fundo: var(--creme);
+  --superficie: var(--creme-claro);
+  --texto: var(--cafe);
+  --texto-suave: var(--texto-sec);
+  --link: var(--ferrugem-hover);
+  --foco: var(--cafe);
+
+  /* sombra de card (paletas.md, seção 5: 0 2px 8px rgba(37,28,20,.08)) */
+  --sombra-card: 0 2px 8px rgba(37, 28, 20, 0.08);
+
+  /* "only" impede o modo escuro forçado de alguns navegadores de inverter as cores */
+  color-scheme: only light;
+}
+
+/* Os mesmos tokens no tema do Tailwind (bg-fundo, text-texto, ring-borda-input, ...). */
+@theme inline {
+  --color-creme: var(--creme);
+  --color-ferrugem: var(--ferrugem);
+  --color-laranja: var(--laranja);
+  --color-cobre: var(--cobre);
+  --color-cafe: var(--cafe);
+  --color-preto: var(--preto);
+
+  --color-creme-claro: var(--creme-claro);
+  --color-borda-suave: var(--borda-suave);
+  --color-borda-input: var(--borda-input);
+  --color-texto-sec: var(--texto-sec);
+  --color-ferrugem-hover: var(--ferrugem-hover);
+  --color-ferrugem-ativo: var(--ferrugem-ativo);
+  --color-laranja-hover: var(--laranja-hover);
+  --color-cobre-esc: var(--cobre-esc);
+  --color-desabilitado: var(--desabilitado);
+
+  --color-erro: var(--erro);
+  --color-erro-fundo: var(--erro-fundo);
+  --color-sucesso: var(--sucesso);
+  --color-sucesso-fundo: var(--sucesso-fundo);
+  --color-aviso-texto: var(--aviso-texto);
+  --color-aviso-fundo: var(--aviso-fundo);
+  --color-info: var(--info);
+  --color-info-fundo: var(--info-fundo);
+  --color-cancelado-fundo: var(--cancelado-fundo);
+
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-link: var(--link);
+  --color-foco: var(--foco);
+
+  --shadow-card: var(--sombra-card);
 
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
   --font-titulo: var(--font-young-serif), Georgia, serif;
-}
-
-:root {
-  /* "only" impede o modo escuro forçado de alguns navegadores de inverter as cores */
-  color-scheme: only light;
 }
 
 html {
@@ -27,8 +96,8 @@ html {
 }
 
 body {
-  background: var(--color-papel);
-  color: var(--color-tinta);
+  background: var(--fundo);
+  color: var(--texto);
   -webkit-tap-highlight-color: transparent;
   /* Evita zoom com toque duplo */
   touch-action: manipulation;
@@ -43,14 +112,66 @@ select {
   font-size: 16px !important;
 }
 
-/* Capa: vermelho com bolinhas, lembrando a borda da logo */
+/* ==========================================================================
+   Foco visível (paletas.md, seção 6)
+   ========================================================================== */
+:focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* Sobre fundo café ou ferrugem o anel é laranja (7.47 sobre café). */
+.fundo-escuro :focus-visible {
+  outline-color: var(--laranja);
+}
+
+/* Campo de busca: o anel aparece no contorno inteiro (focus-within no label), não no input interno. */
+.campo-busca:focus-visible {
+  outline: none;
+}
+
+/* Cartões de opção com o rádio escondido (sr-only): o anel vai no cartão inteiro. */
+label:has(> input.sr-only:focus-visible) {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Rádio: borda --borda-input (≥ 3:1) e marcador --ferrugem
+   ========================================================================== */
+.radio {
+  appearance: none;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--borda-input);
+  border-radius: 9999px;
+  background: var(--superficie);
+  cursor: pointer;
+}
+
+.radio:disabled {
+  border-color: var(--borda-suave);
+  cursor: not-allowed;
+}
+
+.radio:checked {
+  border-color: var(--ferrugem);
+  background: radial-gradient(circle, var(--ferrugem) 0 45%, var(--superficie) 50%);
+}
+
+/* Capa: café com bolinhas cobre (decorativo, sem texto em cima) */
 .capa {
-  background-color: var(--color-vermelho);
+  background-color: var(--cafe);
   background-image:
-    radial-gradient(circle at 20% 30%, rgb(255 255 255 / 0.14) 2px, transparent 2.5px),
-    radial-gradient(circle at 70% 80%, rgb(255 255 255 / 0.08) 2px, transparent 2.5px),
-    linear-gradient(135deg, #e01a22 0%, #b20f17 100%);
-  background-size: 22px 22px, 22px 22px, 100% 100%;
+    radial-gradient(circle at 20% 30%, var(--cobre) 2px, transparent 2.5px),
+    radial-gradient(circle at 70% 80%, var(--cobre) 1.5px, transparent 2px);
+  background-size: 22px 22px, 22px 22px;
+}
+
+/* Com uma janela (sacola, montar pacote) aberta, só ela rola: a página de trás fica parada. */
+body:has(dialog[open]) {
+  overflow: hidden;
 }
 
 /* Bottom sheet da sacola */
@@ -58,7 +179,9 @@ dialog.sheet[open] {
   animation: subir 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+/* Sobreposição com preto (paletas.md: preto só em sombras e sobreposições) */
 dialog.sheet::backdrop {
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(2px);
 }
 
@@ -71,5 +194,11 @@ dialog.sheet::backdrop {
 @media (prefers-reduced-motion: reduce) {
   dialog.sheet[open] {
     animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
   }
 }

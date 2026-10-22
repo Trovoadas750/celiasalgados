@@ -1,8 +1,10 @@
 import { Figtree, Young_Serif } from "next/font/google";
 import { ClienteProvider } from "@/components/cliente/ClienteProvider";
+import BotaoWhatsapp from "@/components/BotaoWhatsapp";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import Sacola from "@/components/sacola/Sacola";
+import { COR_CAFE } from "@/lib/cores";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -25,7 +27,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#d0121b",
+  themeColor: COR_CAFE,
   colorScheme: "only light",
   viewportFit: "cover",
   // Tela fixa: sem zoom de pinça nem zoom automático ao focar campos
@@ -44,6 +46,7 @@ export default function RootLayout({ children }) {
           <main className="mx-auto w-full max-w-2xl flex-1 px-3 pb-10">{children}</main>
           <Footer />
           <Sacola />
+          <BotaoWhatsapp />
         </ClienteProvider>
       </body>
     </html>

@@ -1,6 +1,6 @@
 "use client";
 
-import Campo from "@/components/cliente/Campo";
+import Campo, { MensagemErro } from "@/components/cliente/Campo";
 import { formatarPreco } from "@/lib/formatar";
 import { FORMAS_PAGAMENTO } from "@/lib/pagamento";
 import { OpcaoRadio } from "./BlocoEntrega";
@@ -26,7 +26,7 @@ export function validarPagamento({ forma, troco }, totalEstimado) {
   return {};
 }
 
-export default function BlocoPagamento({ valores, setValores, erros }) {
+export default function BlocoPagamento({ valores, setValores, erros, momento = "na entrega" }) {
   return (
     <div className="space-y-2" data-erro={erros.forma ? true : undefined}>
       {FORMAS_PAGAMENTO.map((f) => (
@@ -37,10 +37,10 @@ export default function BlocoPagamento({ valores, setValores, erros }) {
           atual={valores.forma}
           onChange={(forma) => setValores({ ...valores, forma })}
           titulo={f.rotulo}
-          texto={f.detalhe}
+          texto={f.detalhe(momento)}
         />
       ))}
-      {erros.forma && <p className="text-[13px] font-medium text-vermelho-escuro">{erros.forma}</p>}
+      {erros.forma && <MensagemErro>{erros.forma}</MensagemErro>}
       {valores.forma === "dinheiro" && (
         <Campo
           rotulo="Troco para quanto?"

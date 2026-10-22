@@ -1,7 +1,7 @@
 "use client";
 
 import AcessoConta from "@/components/cliente/AcessoConta";
-import Campo from "@/components/cliente/Campo";
+import Campo, { MensagemErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { IconeCracha } from "@/components/icones";
 import { formatarTelefone } from "@/lib/formatar";
@@ -12,13 +12,13 @@ function Opcao({ titulo, texto, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl bg-cartao p-3 text-left ring-1 ring-borda transition hover:ring-vermelho/50"
+      className="flex w-full items-center gap-3 rounded-xl bg-superficie p-3 text-left ring-1 ring-borda-suave transition hover:ring-borda-input"
     >
       <span className="flex-1">
         <span className="block font-bold">{titulo}</span>
-        <span className="block text-[13px] text-tinta/70">{texto}</span>
+        <span className="block text-sm text-texto-suave">{texto}</span>
       </span>
-      <span aria-hidden="true" className="text-xl font-bold text-vermelho">›</span>
+      <span aria-hidden="true" className="text-xl font-bold text-ferrugem">›</span>
     </button>
   );
 }
@@ -34,22 +34,22 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
   const { estado, dados, convidado, limparConvidado, sair } = useCliente();
 
   if (estado === "carregando") {
-    return <div className="h-24 animate-pulse rounded-xl bg-sepia/60" aria-busy="true" />;
+    return <div className="h-24 animate-pulse rounded-xl bg-borda-suave" aria-busy="true" />;
   }
 
   if (estado === "logado") {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-cartao p-3 ring-1 ring-borda">
-        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-vermelho/10 text-vermelho">
+      <div className="flex items-center gap-3 rounded-xl bg-superficie p-3 ring-1 ring-borda-suave">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-fundo text-cobre">
           <IconeCracha className="size-6" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">
             {dados.nome} {dados.sobrenome}
           </p>
-          <p className="text-sm tabular-nums text-tinta/70">{formatarTelefone(dados.telefone)}</p>
+          <p className="text-sm tabular-nums text-texto-suave">{formatarTelefone(dados.telefone)}</p>
         </div>
-        <button type="button" onClick={sair} className="shrink-0 text-sm font-semibold text-vermelho">
+        <button type="button" onClick={sair} className="shrink-0 text-sm text-link underline underline-offset-4 hover:text-ferrugem-ativo">
           Não é você?
         </button>
       </div>
@@ -58,12 +58,12 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
 
   if (modo === "conta") {
     return (
-      <div className="rounded-xl bg-cartao p-4 ring-1 ring-borda">
+      <div className="rounded-xl bg-superficie p-4 ring-1 ring-borda-suave">
         <AcessoConta />
         <button
           type="button"
           onClick={() => setModo("convidado")}
-          className="mt-4 w-full text-center text-sm font-semibold text-vermelho"
+          className="mt-4 w-full text-center text-sm text-link underline underline-offset-4 hover:text-ferrugem-ativo"
         >
           Prefiro continuar como convidado
         </button>
@@ -76,7 +76,7 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
       setValores({ ...valores, [campo]: valor });
     }
     return (
-      <div className="space-y-3 rounded-xl bg-cartao p-4 ring-1 ring-borda">
+      <div className="space-y-3 rounded-xl bg-superficie p-4 ring-1 ring-borda-suave">
         <div className="grid gap-3 min-[420px]:grid-cols-2">
           <Campo
             rotulo="Nome"
@@ -114,16 +114,16 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
                 limparConvidado();
                 setValores({ nome: "", sobrenome: "", telefone: "" });
               }}
-              className="text-tinta/70 underline underline-offset-4"
+              className="text-texto-suave underline underline-offset-4 transition hover:text-texto"
             >
               Não sou eu / limpar dados
             </button>
           ) : (
-            <button type="button" onClick={() => setModo("escolha")} className="text-tinta/70 underline underline-offset-4">
+            <button type="button" onClick={() => setModo("escolha")} className="text-texto-suave underline underline-offset-4 transition hover:text-texto">
               Voltar
             </button>
           )}
-          <button type="button" onClick={() => setModo("conta")} className="text-vermelho">
+          <button type="button" onClick={() => setModo("conta")} className="text-link underline underline-offset-4 hover:text-ferrugem-ativo">
             Entrar ou criar conta
           </button>
         </div>
@@ -143,7 +143,7 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
         texto="Acompanhe seus pedidos e não digite seus dados de novo."
         onClick={() => setModo("conta")}
       />
-      {erroModo && <p className="text-[13px] font-medium text-vermelho-escuro">{erroModo}</p>}
+      {erroModo && <MensagemErro>{erroModo}</MensagemErro>}
     </div>
   );
 }

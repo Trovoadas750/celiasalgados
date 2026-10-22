@@ -24,11 +24,23 @@ export function formatarDataHora(iso) {
 }
 
 export const STATUS_PEDIDO = {
-  novo: { rotulo: "Recebido", classe: "bg-sky-100 text-sky-800" },
-  em_preparo: { rotulo: "Em preparo", classe: "bg-amber-100 text-amber-900" },
-  saiu_para_entrega: { rotulo: "Saiu para entrega", classe: "bg-violet-100 text-violet-800" },
-  entregue: { rotulo: "Entregue", classe: "bg-emerald-100 text-emerald-800" },
-  cancelado: { rotulo: "Cancelado", classe: "bg-stone-200 text-stone-600" },
+  novo: { rotulo: "Recebido", classe: "bg-laranja text-cafe" },
+  em_preparo: { rotulo: "Em preparo", classe: "bg-aviso-fundo text-aviso-texto" },
+  saiu_para_entrega: { rotulo: "Saiu para entrega", classe: "bg-info-fundo text-info" },
+  entregue: { rotulo: "Entregue", classe: "bg-sucesso-fundo text-sucesso" },
+  cancelado: { rotulo: "Cancelado", classe: "bg-cancelado-fundo text-texto-sec" },
 };
+
+// Status do pedido considerando o tipo de recebimento (contextoBD.md: na retirada,
+// "saiu_para_entrega" é exibido como "Pronto para retirar"; o valor gravado é o mesmo).
+export function statusDoPedido(pedido) {
+  const status = STATUS_PEDIDO[pedido.status] ?? STATUS_PEDIDO.novo;
+  if (pedido.status === "saiu_para_entrega" && pedido.tipo_entrega === "retirada") {
+    return { ...status, rotulo: "Pronto para retirar" };
+  }
+  return status;
+}
+
+export const MODO_PACOTE = { congelado: "Congelado", pronto: "Pronto para comer" };
 
 export const FORMA_PAGAMENTO = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão" };

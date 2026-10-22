@@ -12,7 +12,7 @@ export default function AcessoConta({ modoInicial = "entrar", aoConcluir }) {
 
   return (
     <div>
-      <div role="tablist" className="mb-4 grid grid-cols-2 rounded-xl bg-sepia/60 p-1">
+      <div role="tablist" className="mb-4 grid grid-cols-2 rounded-xl bg-fundo p-1 ring-1 ring-borda-suave">
         {[
           ["entrar", "Entrar"],
           ["cadastro", "Criar conta"],
@@ -24,7 +24,7 @@ export default function AcessoConta({ modoInicial = "entrar", aoConcluir }) {
             aria-selected={modo === id}
             onClick={() => setModo(id)}
             className={`h-10 rounded-lg text-sm font-bold transition ${
-              modo === id ? "bg-cartao text-vermelho shadow-sm" : "text-tinta/70"
+              modo === id ? "bg-superficie text-ferrugem shadow-sm ring-1 ring-borda-input" : "text-texto-suave hover:text-texto"
             }`}
           >
             {rotulo}

@@ -11,7 +11,7 @@ export default function FormEndereco({ valores, setValores, erros }) {
   }
 
   return (
-    <div className="space-y-3 rounded-xl bg-cartao p-4 ring-1 ring-borda">
+    <div className="space-y-3 rounded-xl bg-superficie p-4 ring-1 ring-borda-suave">
       <Campo
         rotulo="Rua"
         autoComplete="address-line1"

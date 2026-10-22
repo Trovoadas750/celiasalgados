@@ -15,18 +15,18 @@ export default function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-20 bg-vermelho text-white shadow-md shadow-vermelho-escuro/20">
+    <header className="sticky top-0 z-20 fundo-escuro bg-cafe text-creme shadow-md">
       <div className="mx-auto flex h-16 max-w-2xl items-center gap-2 px-3">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           <Image
-            src="/logo.png"
+            src="/logo.webp"
             alt="Edna & Célia Salgados"
             width={48}
             height={48}
             priority
             className="size-12 shrink-0 object-contain drop-shadow"
           />
-          <span className="hidden font-titulo text-lg leading-tight text-white min-[400px]:block">
+          <span className="hidden font-titulo text-lg leading-tight text-creme min-[440px]:block">
             Edna &amp; Célia
           </span>
         </Link>
@@ -39,14 +39,14 @@ export default function Header() {
                 key={href}
                 href={href}
                 aria-current={ativo ? "page" : undefined}
-                className={`relative flex w-[4.25rem] flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${
-                  ativo ? "text-white" : "text-white/80 hover:text-white"
+                className={`relative flex w-[4.75rem] flex-col items-center gap-0.5 rounded-xl py-1.5 text-sm font-bold uppercase tracking-wide transition-colors ${
+                  ativo ? "text-laranja" : "text-creme hover:text-laranja"
                 }`}
               >
                 <Icone className="size-6" />
                 {rotulo}
                 <span
-                  className={`absolute -bottom-[7px] h-[3px] w-8 rounded-full bg-white transition-opacity ${
+                  className={`absolute -bottom-[7px] h-[3px] w-8 rounded-full bg-laranja transition-opacity ${
                     ativo ? "opacity-100" : "opacity-0"
                   }`}
                 />

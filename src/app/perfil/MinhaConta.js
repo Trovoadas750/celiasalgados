@@ -7,7 +7,7 @@ import AvisoConta from "@/components/cliente/AvisoConta";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL, CLASSE_BOTAO_SECUNDARIO } from "@/components/cliente/estilos";
-import { IconeCracha } from "@/components/icones";
+import { IconeCheck, IconeCracha } from "@/components/icones";
 import CardPedido, { CarregandoLista } from "@/components/pedidos/CardPedido";
 import { useMeusPedidos } from "@/components/pedidos/useMeusPedidos";
 import { formatarTelefone } from "@/lib/formatar";
@@ -65,7 +65,8 @@ function FormNome({ dados, atualizarNome }) {
       />
       <AlertaErro>{erroGeral}</AlertaErro>
       {aviso && (
-        <p role="status" className="rounded-xl bg-emerald-100 px-3 py-2.5 text-sm font-medium text-emerald-800">
+        <p role="status" className="flex items-center gap-2 rounded-xl bg-sucesso-fundo px-3 py-2.5 text-sm font-medium text-sucesso">
+          <IconeCheck className="size-5 shrink-0" />
           {aviso}
         </p>
       )}
@@ -85,7 +86,7 @@ export default function MinhaConta() {
   if (estado === "carregando") {
     return (
       <div className="pt-5">
-        <div className="mb-5 h-9 w-48 animate-pulse rounded-lg bg-sepia/60" />
+        <div className="mb-5 h-9 w-48 animate-pulse rounded-lg bg-borda-suave" />
         <CarregandoLista linhas={2} />
       </div>
     );
@@ -112,19 +113,19 @@ export default function MinhaConta() {
 
   return (
     <div className="pt-5">
-      <h1 className="font-titulo text-[28px] text-vermelho">Minha conta</h1>
+      <h1 className="font-titulo text-[28px] text-ferrugem">Minha conta</h1>
 
-      <section className="mt-4 overflow-hidden rounded-2xl bg-cartao ring-1 ring-borda">
+      <section className="mt-4 overflow-hidden rounded-2xl bg-superficie ring-1 ring-borda-suave">
         <div className="capa h-16" />
         <div className="-mt-8 flex items-end gap-3 px-4">
-          <span className="grid size-16 shrink-0 place-items-center rounded-full bg-vermelho font-titulo text-xl text-white ring-4 ring-cartao">
+          <span className="grid size-16 shrink-0 place-items-center rounded-full bg-ferrugem font-titulo text-xl text-white ring-4 ring-superficie">
             {iniciais}
           </span>
           <div className="min-w-0 pb-1">
             <p className="truncate text-lg font-bold">
               {dados.nome} {dados.sobrenome}
             </p>
-            <p className="text-sm tabular-nums text-tinta/70">{formatarTelefone(dados.telefone)}</p>
+            <p className="text-sm tabular-nums text-texto-suave">{formatarTelefone(dados.telefone)}</p>
           </div>
         </div>
         {/* key: se o nome mudar em outra aba/sessão, o formulário reinicia com os dados novos */}
@@ -133,8 +134,8 @@ export default function MinhaConta() {
 
       <section className="mt-6">
         <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-titulo text-[22px] text-vermelho">Últimos pedidos</h2>
-          <Link href="/pedidos" className="text-sm font-semibold text-vermelho underline-offset-4 hover:underline">
+          <h2 className="font-titulo text-[22px] text-ferrugem-hover">Últimos pedidos</h2>
+          <Link href="/pedidos" className="text-sm text-link underline underline-offset-4 hover:text-ferrugem-ativo">
             Ver todos
           </Link>
         </div>
@@ -143,7 +144,7 @@ export default function MinhaConta() {
         ) : erro ? (
           <AlertaErro>{erro}</AlertaErro>
         ) : pedidos.length === 0 ? (
-          <p className="rounded-2xl bg-cartao px-4 py-6 text-center text-sm text-tinta/70 ring-1 ring-borda">
+          <p className="rounded-2xl bg-superficie px-4 py-6 text-center text-sm text-texto-suave ring-1 ring-borda-suave">
             Nenhum pedido feito com esta conta ainda.
           </p>
         ) : (

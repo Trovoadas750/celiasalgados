@@ -23,13 +23,13 @@ export default function Entrar() {
 
   return (
     <div className="mx-auto max-w-md pt-6">
-      <h1 className="font-titulo text-[28px] leading-tight text-vermelho">
+      <h1 className="font-titulo text-[28px] leading-tight text-ferrugem">
         {modo === "cadastro" ? "Crie sua conta" : "Entre na sua conta"}
       </h1>
-      <p className="mb-5 mt-1 text-sm text-tinta/70">
+      <p className="mb-5 mt-1 text-sm text-texto-suave">
         Com uma conta você acompanha seus pedidos e não precisa digitar seus dados toda vez.
       </p>
-      <div className="rounded-2xl bg-cartao p-4 ring-1 ring-borda">
+      <div className="rounded-2xl bg-superficie p-4 ring-1 ring-borda-suave">
         <AcessoConta key={modo} modoInicial={modo} aoConcluir={() => router.replace(destino)} />
       </div>
     </div>

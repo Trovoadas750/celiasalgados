@@ -52,7 +52,7 @@ export default function FormLogin({ aoEntrar }) {
       <button type="submit" disabled={enviando} className={CLASSE_BOTAO_PRINCIPAL}>
         {enviando ? "Entrando…" : "Entrar"}
       </button>
-      <p className="text-center text-[13px] text-tinta/70">
+      <p className="text-center text-sm text-texto-suave">
         Esqueceu a senha? Fale com a salgadaria para redefinir a senha.
       </p>
     </form>
