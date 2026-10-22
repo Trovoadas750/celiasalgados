@@ -133,6 +133,9 @@ export default function BannerInicio() {
             ›
           </span>
         </a>
+
+        {/* Desktop: status da loja abaixo do botão (o do celular fica ao lado da logo) */}
+        <StatusLoja sobreEscuro className="mt-[1.2vw] hidden lg:flex" />
       </div>
     </section>
   );

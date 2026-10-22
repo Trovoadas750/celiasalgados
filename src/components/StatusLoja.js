@@ -31,8 +31,10 @@ function textoProximaAbertura(iso) {
 /**
  * Selo "Aberto agora / Fechado" (ícones diferentes). Clicar abre a caixa com os horários da semana.
  * Aberto: sucesso (5.42) · Fechado: erro (6.43). Atualiza a cada 5 min e ao voltar para a aba.
+ * `sobreEscuro`: o selo fica sobre fundo escuro (banner do desktop), então o anel de foco do botão
+ * continua laranja; a caixa de horários (fundo claro) sempre usa o anel café.
  */
-export default function StatusLoja({ className = "" }) {
+export default function StatusLoja({ className = "", sobreEscuro = false }) {
   const [status, setStatus] = useState(undefined); // undefined = carregando · null = falhou
   const [semana, setSemana] = useState(null);
   const [hojeDia, setHojeDia] = useState(null);
@@ -65,7 +67,7 @@ export default function StatusLoja({ className = "" }) {
 
   if (status === null) return null; // sem conexão com o banco: não mostra nada
   if (status === undefined) {
-    return <span aria-hidden="true" className={`block h-12 w-40 animate-pulse rounded-2xl bg-borda-suave ${className}`} />;
+    return <span aria-hidden="true" className={`h-12 w-40 animate-pulse rounded-2xl bg-borda-suave ${className}`} />;
   }
 
   const aberta = status.aberta;
@@ -79,7 +81,8 @@ export default function StatusLoja({ className = "" }) {
       : "sem horário nos próximos dias";
 
   return (
-    <span className="fundo-claro contents">
+    <>
+      <span className={sobreEscuro ? "contents" : "fundo-claro contents"}>
       <button
         type="button"
         onClick={abrir}
@@ -98,6 +101,9 @@ export default function StatusLoja({ className = "" }) {
           ›
         </span>
       </button>
+      </span>
+
+      <span className="fundo-claro contents">
 
       <dialog
         ref={dialogo}
@@ -160,6 +166,7 @@ export default function StatusLoja({ className = "" }) {
           <p className="mt-3 text-sm text-texto-suave">Fora do horário, você ainda pode agendar seu pedido.</p>
         </div>
       </dialog>
-    </span>
+      </span>
+    </>
   );
 }
