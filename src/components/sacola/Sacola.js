@@ -150,12 +150,12 @@ export default function Sacola() {
         ref={dialogo}
         aria-label="Sacola"
         onClick={(e) => e.target === dialogo.current && dialogo.current.close()}
-        className="sheet m-0 mt-auto max-h-[88dvh] w-full max-w-none rounded-t-3xl bg-fundo p-0 text-texto sm:mx-auto sm:max-w-2xl"
+        className="sheet m-0 mt-auto max-h-[88dvh] w-full max-w-none rounded-t-3xl border-t-4 border-vinho bg-fundo p-0 text-texto sm:mx-auto sm:max-w-2xl"
       >
         <div className="flex max-h-[88dvh] flex-col">
-          <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-borda-suave" />
+          <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-vinho" />
           <header className="flex items-center justify-between px-5 pb-3 pt-2">
-            <h2 className="font-titulo text-2xl text-ferrugem">Sua sacola</h2>
+            <h2 className="traco-vinho font-titulo text-2xl text-ferrugem">Sua sacola</h2>
             <button
               type="button"
               onClick={() => dialogo.current.close()}

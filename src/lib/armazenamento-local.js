@@ -44,3 +44,42 @@ export function lerUltimoEndereco() {
 export function salvarUltimoEndereco({ rua, vila, numero, ponto_referencia }) {
   gravar(CHAVE_ENDERECO, { rua, vila, numero, ponto_referencia });
 }
+
+// ---- Lembrete de pagamento (horários em milissegundos, Date.now()) ----
+const CHAVE_ULTIMA_NOTIFICACAO = "celiasalgados:lembrete:ultima-notificacao";
+const CHAVE_LEMBRETE_FECHADO_ATE = "celiasalgados:lembrete:fechado-ate";
+
+function lerNumero(chave) {
+  try {
+    const n = Number(window.localStorage.getItem(chave));
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function gravarNumero(chave, valor) {
+  try {
+    window.localStorage.setItem(chave, String(valor));
+  } catch {
+    // Sem armazenamento: só não lembra entre recarregamentos.
+  }
+}
+
+/** Quando o navegador mostrou a última notificação do sistema (0 = nunca). */
+export function lerUltimaNotificacao() {
+  return lerNumero(CHAVE_ULTIMA_NOTIFICACAO);
+}
+
+export function salvarUltimaNotificacao(quando = Date.now()) {
+  gravarNumero(CHAVE_ULTIMA_NOTIFICACAO, quando);
+}
+
+/** Até quando o banner de pagamento fica fechado (0 = aberto). */
+export function lerLembreteFechadoAte() {
+  return lerNumero(CHAVE_LEMBRETE_FECHADO_ATE);
+}
+
+export function fecharLembretePor(ms) {
+  gravarNumero(CHAVE_LEMBRETE_FECHADO_ATE, Date.now() + ms);
+}

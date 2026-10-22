@@ -25,13 +25,36 @@ Este documento descreve **apenas a estrutura do banco**. O banco já está criad
   - **assado**: tem acréscimo;
   - **variado** (mini pastel, mini churros, palito de queijo): tem acréscimo e **só sai pronto para comer**.
 - O acréscimo de cada sabor fica no banco (`acrescimo_percentual`). **O site nunca mostra percentual, nem diz que assado é mais caro.** Ele mostra só o preço final, calculado pelo banco.
-- **Assados prontos** só podem ser pedidos com **agendamento a partir do dia seguinte**.
-- **Entrega só até 100 salgados** (1 cento) no pedido inteiro. Acima disso, **só retirada no local**.
 - **Refrigerantes** são vendidos por unidade, à parte dos pacotes, e não têm imagem.
 
+**Horário e agendamento** (tudo validado pelo banco, horário de Brasília):
+- A loja tem um **horário de atendimento** por dia da semana (`horarios_funcionamento`) e **dias fechados** (`dias_fechados`).
+- **Dentro do horário**, o cliente escolhe "**Agora**" (entrega ou retirada) ou "**Agendar**".
+- **Fora do horário**, o pedido **só pode ser agendado**.
+- **Agendamento em horários de 30 em 30 minutos**, a partir da abertura de cada faixa.
+  - O último horário é 30 min antes de fechar.
+  - **Cada horário atende só UM pedido.** Garantido por índice único: dois clientes nunca pegam o mesmo horário, nem clicando ao mesmo tempo.
+  - Pedido cancelado libera o horário.
+  - Para agendar no mesmo dia, é preciso **pelo menos 1 hora de antecedência**.
+  - Dá para agendar até 90 dias à frente.
+- **Entrega só até 100 salgados** (1 cento). **Acima de 100**, o pedido é **só retirada no local** e **precisa ser agendado a partir do dia seguinte**.
+- **Assados prontos** precisam ser **agendados a partir do dia seguinte**.
+
+**Pagamento do agendamento:**
+- **Para agendar é obrigatório ter conta de cliente e estar logado.** O pedido fica gravado na conta (`cliente_id`). O pedido "agora" continua liberado para convidado.
+- Todo agendamento nasce com **pagamento pendente** (`pagamento_status = 'pendente'`). Ele só fica **confirmado** quando o pagamento é confirmado (`'pago'`).
+- **Prazo para pagar:** 2 horas, ou até o horário agendado, o que vier antes (`pagamento_expira_em`).
+  - Passou do prazo sem pagar: o pedido é **cancelado automaticamente** (`pagamento_status = 'expirado'`) e o horário fica livre de novo.
+  - A expiração roda sozinha antes de cada novo pedido. Não precisa de cron.
+- **O sistema de pagamento ainda não existe.** Por enquanto, o **admin confirma pelo painel** com `confirmar_pagamento`. No futuro, o webhook do provedor chama a mesma função com a chave secreta, no servidor.
+- **Lembretes de 30 em 30 minutos:**
+  - no site, `meus_pagamentos_pendentes()` já devolve a mensagem pronta;
+  - no servidor (futuro WhatsApp/SMS), `pedidos_para_lembrete()` + `registrar_lembrete()`.
+- Pedidos "agora": `pagamento_status = 'nao_exigido'`, e o pagamento é feito na entrega/retirada.
+
 **Preço do pacote** (calculado só no banco, pela função interna `private.precificar`):
-- se **todos** os sabores são assados e o pacote tem `preco_so_assado`, usa esse preço;
-- senão: `preço base × Σ(quantidade do sabor × (1 + acréscimo/100)) ÷ total de salgados do pacote`.
+- regra de mistura: `preço base × Σ(quantidade do sabor × (1 + acréscimo/100)) ÷ total de salgados do pacote`;
+- se **todos** os sabores são assados e o pacote tem `preco_so_assado`, usa o **maior** valor entre `preco_so_assado` e a regra de mistura. Assim, uma esfiha fica no preço da tabela, e a mini pizza, que tem acréscimo maior, sai pelo valor dela.
 
 Exemplos:
 - cento com 50 coxinhas + 50 esfihas: 75 × (50 + 57,5) / 100 = **R$ 80,63**;
@@ -96,10 +119,11 @@ clientes ──< pedidos ──< itens_pedido ──< itens_pedido_conteudo
 | tipo | sabores | acréscimo | congelado | pronto | antecedência |
 |---|---|---|---|---|---|
 | frito | Coxinha de frango, Kibe de carne, Bolinha de queijo, Enrolado de salsicha, Risole de queijo, Risole de frango com catupiry, Risole de palmito, Risole de carne, Croquete de milho, Medalhão de presunto e queijo | 0% | sim | sim | 0 |
-| assado | Esfiha de frango com catupiry, Esfiha de carne, Mini hambúrguer, Mini pizza de presunto e queijo, Mini pizza de queijo | 15% | sim | sim | 1 dia |
-| variado | Mini pastel de carne, Mini pastel de pizza, Mini pastel de queijo | 12% | não | sim | 0 |
-| variado | Mini churros de doce de leite | 14% | não | sim | 0 |
-| variado | Palito de queijo | 20% | não | sim | 0 |
+| assado | Esfiha de frango com catupiry, Esfiha de carne, Mini hambúrguer | 15% | sim | sim | 1 dia |
+| assado | Mini pizza de presunto e queijo, Mini pizza de queijo | 72,35% | sim | sim | 1 dia |
+| variado | Mini pastel de carne, Mini pastel de pizza, Mini pastel de queijo | 19,37% | não | sim | 0 |
+| variado | Mini churros de doce de leite | 19,37% | não | sim | 0 |
+| variado | Palito de queijo | 52,49% | não | sim | 0 |
 
 Refrigerantes: Coca-Cola 2L, Coca-Cola 600ml, Guaraná Conquista 2L e Guaraná Conquista 600ml.
 
@@ -146,12 +170,18 @@ Kit dentro de kit é proibido.
 | vila | text | 2–80; **obrigatório só na entrega** |
 | numero | text | 1–10 (aceita "123A", "S/N"); **obrigatório só na entrega** |
 | ponto_referencia | text | opcional, até 200 (null na retirada) |
-| agendado_para | timestamptz | null = o quanto antes; data = agendamento (futuro, até 90 dias). **Obrigatório** quando há assado pronto |
+| agendado_para | timestamptz | null = "agora" (só com a loja aberta); preenchido = um dos horários de `horarios_disponiveis`. **Obrigatório** fora do horário, com assado pronto ou com mais de 100 salgados. **Único** entre pedidos não cancelados (índice `pedidos_um_por_horario`) |
 | forma_pagamento | text | opcional: `'pix'` \| `'dinheiro'` \| `'cartao'` |
 | troco_para | numeric(10,2) | opcional, > 0; só com `'dinheiro'`, e ≥ total |
 | observacao | text | opcional, até 500 |
 | status | text | default `'novo'`; `'novo'` \| `'em_preparo'` \| `'saiu_para_entrega'` \| `'entregue'` \| `'cancelado'` |
 | total | numeric(10,2) | calculado pelo banco |
+| pagamento_status | text | `'nao_exigido'` (pedido agora) \| `'pendente'` (agendado aguardando pagamento) \| `'pago'` (agendamento **confirmado**) \| `'expirado'` (não pagou no prazo; pedido cancelado) |
+| pagamento_expira_em | timestamptz | prazo para pagar (só agendados) |
+| pago_em | timestamptz | quando o pagamento foi confirmado |
+| pagamento_referencia | text | até 200; id da transação no provedor (futuro) ou anotação do admin (ex.: "PIX 23/10") |
+| lembretes_enviados | integer | lembretes enviados pelo servidor (estrutura futura) |
+| ultimo_lembrete_em | timestamptz | último lembrete enviado pelo servidor |
 
 Constraints:
 - `endereco_obrigatorio_na_entrega`;
@@ -181,6 +211,25 @@ Na retirada, o status `'saiu_para_entrega'` não se aplica. O painel pode exibir
 | nome_produto | text | snapshot (ex.: "Coxinha de frango") |
 | quantidade | integer | > 0; total do sabor, **já multiplicado** pelo nº de pacotes da linha |
 | escolhido_pelo_cliente | boolean | `true` = sabor escolhido |
+
+### `horarios_funcionamento` — horário de atendimento
+| coluna | tipo | regras |
+|---|---|---|
+| id | bigint (identity) | PK |
+| dia_semana | smallint | 0 = domingo, 1 = segunda ... 6 = sábado |
+| abre | time | início da faixa (ex.: 08:00) |
+| fecha | time | fim da faixa (ex.: 18:00); pelo menos 30 min depois de `abre` |
+| ativo | boolean | default true |
+
+- Pode haver **mais de uma faixa no mesmo dia** (ex.: 08:00–12:00 e 13:30–18:00).
+- Dia da semana sem linha ativa = fechado.
+- Os horários de agendamento são gerados de 30 em 30 min a partir de `abre`, até 30 min antes de `fecha`.
+
+### `dias_fechados` — feriados e folgas
+| coluna | tipo | regras |
+|---|---|---|
+| data | date | PK |
+| motivo | text | opcional, até 120 (ex.: "Natal") |
 
 ### `admins`
 - Colunas: `user_id` (PK, FK → auth.users) e `criado_em`.
@@ -215,7 +264,10 @@ Retorno:
   "limite_entrega": 100,
   "entrega_permitida": false,
   "exige_agendamento": true,
-  "data_minima_agendamento": "2026-10-22",
+  "motivo_agendamento": "acima_do_limite",
+  "data_minima_agendamento": "2026-10-23",
+  "loja_aberta": true,
+  "pode_pedir_agora": false,
   "itens": [
     { "produto_id": 23, "nome_produto": "Cento (100 salgados)", "modo": "pronto",
       "quantidade": 2, "preco_unitario": 75.00, "subtotal": 150.00 },
@@ -225,11 +277,40 @@ Retorno:
 }
 ```
 
-- `data_minima_agendamento` é null quando `exige_agendamento` é false.
+- `entrega_permitida`: false quando há mais de `limite_entrega` salgados. Nesse caso é **só retirada**.
+- `exige_agendamento`: true quando há assado pronto ou mais de 100 salgados.
+- `motivo_agendamento`: `'acima_do_limite'` (mais de 100 salgados), `'assados'` ou null.
+- `data_minima_agendamento`: primeiro dia que pode ser agendado. É **sempre preenchida** (hoje, quando não há restrição).
+- `loja_aberta`: a loja está no horário de atendimento agora.
+- `pode_pedir_agora`: true só se `loja_aberta` e não `exige_agendamento`. Se false, o checkout **só oferece agendar**.
 - Os itens voltam **na mesma ordem** em que foram enviados.
 
+### `status_loja()` → `jsonb`: anon e authenticated
+```json
+{ "aberta": false, "fecha_as": null, "proxima_abertura": "2026-10-23T08:00:00-03:00" }
+```
+- `fecha_as` ("HH:MM") vem preenchido só quando a loja está aberta.
+- `proxima_abertura`: próxima vez que a loja abre nos próximos 14 dias (null se não houver).
+
+### `horarios_disponiveis(p_data date, p_itens jsonb default null)` → `jsonb`: anon e authenticated
+Horários **livres** para agendar em uma data (formato `'YYYY-MM-DD'`):
+```json
+[ { "inicio": "2026-10-23T08:00:00-03:00", "hora": "08:00" },
+  { "inicio": "2026-10-23T08:30:00-03:00", "hora": "08:30" } ]
+```
+- Já remove os horários ocupados por outros pedidos (não cancelados), os horários a menos de 1 hora de agora, os dias fechados e os horários fora do expediente.
+- Se `p_itens` for enviado (os itens do carrinho), aplica também a data mínima: com assados prontos ou mais de 100 salgados, **hoje volta vazio**.
+- Lista vazia = sem horário nesse dia.
+- Envie o **`inicio` exatamente como veio** em `p_agendado_para` do `criar_pedido`.
+- Não revela nada sobre os outros pedidos, só quais horários estão livres.
+
 ### `criar_pedido(...)` → `jsonb`: anon e authenticated
-Grava o pedido inteiro e devolve `{"numero": <id>, "total": <numeric>}`.
+Grava o pedido inteiro e devolve:
+```json
+{ "numero": 11, "total": 75.00, "pagamento_status": "pendente", "pagamento_expira_em": "2026-10-22T21:37:00-03:00" }
+```
+- Pedido "agora": `pagamento_status = "nao_exigido"` e `pagamento_expira_em = null`.
+- **Agendamento exige cliente logado.**
 
 | parâmetro | tipo | obrigatório |
 |---|---|---|
@@ -244,7 +325,7 @@ Grava o pedido inteiro e devolve `{"numero": <id>, "total": <numeric>}`.
 | p_forma_pagamento | text | não (`pix` / `dinheiro` / `cartao`) |
 | p_troco_para | numeric | não (só com `dinheiro`) |
 | p_observacao | text | não |
-| p_agendado_para | timestamptz | **sim, se houver assado pronto** (ISO string) |
+| p_agendado_para | timestamptz | null = "agora"; senão, o `inicio` de um item de `horarios_disponiveis`. **Obrigatório** fora do horário, com assado pronto ou com mais de 100 salgados |
 | p_tipo_entrega | text | não; default `'entrega'`; ou `'retirada'` |
 
 **Formato de `p_itens`** (mesmo formato para `calcular_pedido`), de 1 a 30 linhas:
@@ -267,19 +348,54 @@ Grava o pedido inteiro e devolve `{"numero": <id>, "total": <numeric>}`.
 **Regras aplicadas:**
 - preço sempre do banco, nunca do site;
 - `cliente_id` preenchido automaticamente se o usuário estiver logado como cliente;
-- entrega com mais de 100 salgados → erro (use retirada);
+- entrega com mais de 100 salgados → erro (só retirada);
 - entrega exige rua, vila e número;
-- pacote **pronto** com assado exige `agendado_para` com data (horário de Brasília) ≥ amanhã;
+- pedido "agora" (`agendado_para` null) só com a loja aberta e sem restrição de agendamento;
+- pedido agendado:
+  - precisa ser um horário válido (30 em 30 min, dentro do expediente, fora de dia fechado);
+  - pelo menos 1 hora à frente e no máximo 90 dias;
+  - data ≥ `data_minima_agendamento`;
+- **horário já ocupado** por outro pedido → erro (o índice único garante, mesmo com cliques simultâneos);
 - no máximo 3 pedidos por telefone a cada 10 minutos;
 - troco ≥ total.
 
 **Erros** (o campo `error.code` do supabase-js traz o SQLSTATE):
 - `P0001`: regra de negócio; `error.message` já vem **em português**, pronto para exibir. Exemplos:
-  - `A entrega só é possível para pedidos de até 100 salgados (1 cento). Para quantidades maiores, escolha retirada no local.`
-  - `Pedidos com assados precisam ser agendados com pelo menos 1 dia(s) de antecedência (a partir de 22/10/2026).`
+  - `Estamos fora do horário de atendimento. Agende seu pedido para um dos horários disponíveis.`
+  - `Esse horário acabou de ser reservado por outro cliente. Escolha outro horário.` (recarregue os horários)
+  - `Horário de agendamento inválido. Escolha um dos horários disponíveis.`
+  - `Agende com pelo menos 1 hora de antecedência.`
+  - `Para agendar um pedido, entre na sua conta ou crie uma.`
+  - `A entrega só é possível para pedidos de até 100 salgados (1 cento). Acima disso, o pedido é só para retirada no local, com agendamento a partir do dia seguinte.`
+  - `Pedidos acima de 100 salgados precisam ser agendados a partir de 23/10/2026 para retirada no local.`
+  - `Pedidos com assados precisam ser agendados a partir de 23/10/2026.`
   - `"30 salgados" aceita no máximo 2 sabores.`
   - `Um dos sabores escolhidos para "30 salgados" não está disponível na opção congelado.`
 - `23514`: dado fora do formato (nome curto, telefone inválido...).
+
+### `confirmar_pagamento(p_pedido_id bigint, p_referencia text default null)` → `jsonb`
+Confirma o agendamento: `pagamento_status` vira `'pago'` e `pago_em` recebe a data atual.
+- **Quem pode:** admin logado (painel) ou o servidor com a chave secreta (webhook futuro). Cliente e visitante recebem erro.
+- Só funciona em pedido com pagamento `'pendente'` e não cancelado. Senão, devolve o erro `Pedido X não encontrado ou sem pagamento pendente.`
+- Retorno: `{ "numero", "pagamento_status": "pago", "pago_em", "agendado_para" }`.
+
+### `meus_pagamentos_pendentes()` → `jsonb` (authenticated)
+Agendamentos do **cliente logado** aguardando pagamento e ainda dentro do prazo:
+```json
+[ { "numero": 11, "total": 75.00, "agendado_para": "2026-10-23T11:00:00-03:00",
+    "expira_em": "2026-10-22T21:37:00-03:00",
+    "mensagem": "Para confirmar seu agendamento do pedido nº 11, realize o pagamento de R$ 75,00!" } ]
+```
+O site chama ao abrir e de 30 em 30 minutos para exibir o lembrete. Lista vazia = nada pendente.
+
+### `pedidos_para_lembrete()` → `jsonb` e `registrar_lembrete(p_pedido_id bigint)` (só chave secreta)
+Estrutura para lembretes enviados pelo **servidor** (WhatsApp/SMS/e-mail, quando houver provedor):
+- `pedidos_para_lembrete()` lista os pendentes que não recebem lembrete há 30 min ou mais (`numero`, `nome`, `telefone`, `total`, `agendado_para`, `expira_em`, `lembretes_enviados`).
+- Depois de enviar, chame `registrar_lembrete(numero)`.
+- **Nunca chamar do navegador.** Só de rota de API no servidor, com `sb_secret_...`.
+
+### `expirar_pagamentos_pendentes()` → `integer` (admin ou chave secreta)
+Força a expiração dos agendamentos vencidos agora e devolve quantos cancelou. Opcional: a expiração já acontece sozinha a cada novo pedido. O painel pode chamar ao abrir.
 
 ### `sou_admin()` → `boolean` (authenticated)
 Diz se o usuário logado é admin.
@@ -299,6 +415,8 @@ Usada pelo keep-alive diário.
 | pedidos | — | SELECT dos próprios | SELECT, UPDATE, DELETE todos |
 | itens_pedido | — | SELECT dos próprios | SELECT, UPDATE, DELETE |
 | itens_pedido_conteudo | — | SELECT dos próprios | SELECT, UPDATE, DELETE |
+| horarios_funcionamento | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
+| dias_fechados | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
 | admins | — | — | — |
 
 > `acrescimo_percentual` é legível pela API (como as demais colunas de `produtos`), mas **não deve ser selecionado nem exibido** nas telas públicas. Nas consultas do site, liste as colunas explicitamente.
@@ -346,13 +464,20 @@ supabase.from('pedidos')
 Simular e depois criar:
 ```js
 const { data: resumo } = await supabase.rpc('calcular_pedido', { p_itens })
-// mostra resumo.total, avisa se !resumo.entrega_permitida, pede data se resumo.exige_agendamento
+// mostra resumo.total; se !resumo.entrega_permitida -> só retirada;
+// se !resumo.pode_pedir_agora -> só "Agendar"
+
+const { data: horarios } = await supabase.rpc('horarios_disponiveis', {
+  p_data: '2026-10-23',   // data escolhida (>= resumo.data_minima_agendamento)
+  p_itens,                // aplica a data mínima do carrinho
+})
+// horarios = [{ inicio, hora }, ...] -> mostrar "hora", enviar "inicio"
 
 const { data, error } = await supabase.rpc('criar_pedido', {
   p_nome, p_sobrenome, p_telefone,
   p_rua: null, p_vila: null, p_numero: null,      // retirada
   p_itens, p_tipo_entrega: 'retirada',
-  p_agendado_para: '2026-10-22T15:00:00-03:00',
+  p_agendado_para: horarios[0].inicio,           // ou null para "agora"
   p_forma_pagamento: 'pix', p_troco_para: null, p_observacao: null, p_ponto_referencia: null,
 })
 ```

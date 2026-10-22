@@ -44,3 +44,45 @@ export function statusDoPedido(pedido) {
 export const MODO_PACOTE = { congelado: "Congelado", pronto: "Pronto para comer" };
 
 export const FORMA_PAGAMENTO = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão" };
+
+// ---- Datas do agendamento (sempre em Brasília) ----
+const FUSO = "America/Sao_Paulo";
+const diaSemana = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: FUSO });
+const diaMes = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: FUSO });
+const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
+
+/** "2026-10-23T11:00:00-03:00" -> "sex, 23/10" */
+export function formatarDiaComSemana(iso) {
+  const data = new Date(iso);
+  return `${diaSemana.format(data).replace(".", "")}, ${diaMes.format(data)}`;
+}
+
+/** -> "11:00" */
+export function formatarHora(iso) {
+  return hora.format(new Date(iso));
+}
+
+/** -> "23/10" */
+export function formatarDiaMes(iso) {
+  return diaMes.format(new Date(iso));
+}
+
+/** Mesmo dia no calendário de Brasília? */
+export function mesmoDiaEmBrasilia(a, b) {
+  return diaMes.format(new Date(a)) === diaMes.format(new Date(b));
+}
+
+/** 75 -> "75,00" (sem "R$", para frases do tipo "R$ {valor}") */
+export function formatarValor(valor) {
+  return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Milissegundos até o prazo -> "1h 37min", "12 min" ou "menos de 1 min" */
+export function formatarTempoRestante(ms) {
+  const minutos = Math.floor(ms / 60000);
+  if (minutos < 1) return "menos de 1 min";
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
+}

@@ -23,9 +23,16 @@ export function paraItensDoBanco(itens) {
   });
 }
 
+// Erro do criar_pedido quando um convidado tenta agendar (o checkout abre o login).
+export const MSG_AGENDAR_SEM_CONTA = "Para agendar um pedido, entre na sua conta ou crie uma.";
+
 function erroDoBanco(error) {
   // P0001: regra de negócio; a mensagem já vem em português, pronta para exibir.
-  if (error.code === "P0001") return new Error(error.message);
+  if (error.code === "P0001") {
+    const erro = new Error(error.message);
+    erro.exigeConta = error.message?.includes(MSG_AGENDAR_SEM_CONTA) ?? false;
+    return erro;
+  }
   if (error.code === "23514") return new Error("Confira os dados informados.");
   return new Error("Não foi possível concluir o pedido agora. Tente novamente.");
 }
@@ -78,7 +85,8 @@ export async function calcularPedido(itens) {
  *   trocoPara?: number | null,       // só com "dinheiro"
  *   observacao?: string | null,
  * }} pedido
- * @returns {Promise<{ numero: number, total: number }>}
+ * @returns {Promise<{ numero: number, total: number, pagamentoStatus: string, pagamentoExpiraEm: string | null }>}
+ * Agendado: pagamentoStatus "pendente" e prazo em pagamentoExpiraEm. "Agora": "nao_exigido" e null.
  */
 export async function criarPedido({
   cliente,
@@ -113,5 +121,10 @@ export async function criarPedido({
   });
 
   if (error) throw erroDoBanco(error);
-  return { numero: data.numero, total: numero(data.total) };
+  return {
+    numero: data.numero,
+    total: numero(data.total),
+    pagamentoStatus: data.pagamento_status ?? "nao_exigido",
+    pagamentoExpiraEm: data.pagamento_expira_em ?? null,
+  };
 }

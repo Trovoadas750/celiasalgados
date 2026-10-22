@@ -1,4 +1,5 @@
 import { IconeMotoboy, IconeRetirada } from "@/components/icones";
+import StatusPagamento from "@/components/pagamento/StatusPagamento";
 import { ehRetirada } from "@/lib/entrega";
 import { FORMA_PAGAMENTO, STATUS_PEDIDO, formatarDataHora, formatarPreco } from "@/lib/formatar";
 
@@ -6,7 +7,7 @@ import { FORMA_PAGAMENTO, STATUS_PEDIDO, formatarDataHora, formatarPreco } from 
 export default function CardPedido({ pedido }) {
   const status = STATUS_PEDIDO[pedido.status] ?? STATUS_PEDIDO.novo;
   return (
-    <article className="rounded-2xl bg-superficie p-4 ring-1 ring-borda-suave">
+    <article className="rounded-2xl border-l-4 border-vinho bg-superficie p-4 ring-1 ring-borda-suave">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-titulo text-lg text-ferrugem">Pedido nº {pedido.id}</h2>
@@ -37,6 +38,9 @@ export default function CardPedido({ pedido }) {
           Encomenda para {formatarDataHora(pedido.agendado_para)}
         </p>
       )}
+
+      {/* Só agendamentos: aguardando / confirmado / cancelado por falta de pagamento */}
+      <StatusPagamento status={pedido.pagamento_status} expiraEm={pedido.pagamento_expira_em} className="mt-2" />
 
       <ul className="mt-3 space-y-2 border-t border-dashed border-borda-suave pt-3 text-sm">
         {pedido.itens_pedido.map((item) => (

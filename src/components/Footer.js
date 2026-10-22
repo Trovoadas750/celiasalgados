@@ -16,7 +16,7 @@ const ROTULOS = {
 export default function Footer() {
   return (
     // O padding de baixo deixa espaço para a barra fixa da sacola
-    <footer className="fundo-escuro bg-cafe pb-[calc(env(safe-area-inset-bottom)+7rem)] text-creme">
+    <footer className="fundo-escuro border-t-4 border-vinho bg-cafe pb-[calc(env(safe-area-inset-bottom)+7rem)] text-creme">
       <div className="mx-auto max-w-2xl px-3 pt-6">
         <Link href="/" className="inline-flex min-w-0 items-center gap-2">
           <Image
@@ -53,7 +53,7 @@ export default function Footer() {
           })}
         </ul>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-cobre pt-4 text-sm">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-vinho pt-4 text-sm">
           <nav aria-label="Páginas legais">
             <ul className="flex flex-wrap gap-x-4 gap-y-1">
               {PAGINAS_LEGAIS.map(({ href, rotulo }) => (

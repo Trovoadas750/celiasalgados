@@ -1,4 +1,5 @@
 import { getSupabase, supabaseConfigurado, MENSAGEM_SEM_CONFIGURACAO } from "./supabase";
+import { sortearAvatar } from "./avatar";
 import { soDigitos } from "./validacao";
 
 // Autenticação do cliente: telefone + senha, sem e-mail e sem SMS (contextoBD.md, seção 3).
@@ -48,7 +49,8 @@ export async function cadastrar({ nome, sobrenome, telefone, senha }) {
   const { data, error } = await getSupabase().auth.signUp({
     email: emailDoTelefone(telefone),
     password: senha,
-    options: { data: { nome: nome.trim(), sobrenome: sobrenome.trim() } },
+    // avatar: sorteado aqui e guardado só nos metadados do login (lib/avatar.js)
+    options: { data: { nome: nome.trim(), sobrenome: sobrenome.trim(), avatar: sortearAvatar() } },
   });
   if (error) return { erro: mensagemErroAuth(error) };
   // Com "Confirm email" desligado o signUp já devolve sessão. Se o e-mail já existia,
@@ -101,6 +103,7 @@ export async function buscarMeusPedidos(userId, { pagina = 0, porPagina = 20 } =
     .from("pedidos")
     .select(
       `id, criado_em, status, tipo_entrega, agendado_para, forma_pagamento, total, rua, vila, numero, ponto_referencia,
+      pagamento_status, pagamento_expira_em,
       itens_pedido ( id, categoria, nome_produto, modo, quantidade, preco_unitario, subtotal,
         itens_pedido_conteudo ( nome_produto, quantidade ) )`,
     )
@@ -109,4 +112,21 @@ export async function buscarMeusPedidos(userId, { pagina = 0, porPagina = 20 } =
     .range(inicio, inicio + porPagina - 1);
   if (error) return { pedidos: [], erro: "Não foi possível carregar seus pedidos." };
   return { pedidos: data, erro: null };
+}
+
+// Troca o avatar do cliente logado. Fica em user_metadata (lib/avatar.js), não em `clientes`.
+export async function atualizarAvatar(numero) {
+  const { data, error } = await getSupabase().auth.updateUser({ data: { avatar: numero } });
+  if (error) return { usuario: null, erro: mensagemErroAuth(error) };
+  return { usuario: data.user, erro: null };
+}
+
+/**
+ * Agendamentos do cliente logado aguardando pagamento, ainda no prazo.
+ * @returns {Promise<{ pendentes: { numero, total, agendado_para, expira_em, mensagem }[], erro: string | null }>}
+ */
+export async function buscarPagamentosPendentes() {
+  const { data, error } = await getSupabase().rpc("meus_pagamentos_pendentes");
+  if (error) return { pendentes: [], erro: MSG_GENERICA };
+  return { pendentes: (data ?? []).map((p) => ({ ...p, total: Number(p.total) })), erro: null };
 }

@@ -6,14 +6,23 @@ import AvisoConta from "@/components/cliente/AvisoConta";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { AlertaErro } from "@/components/cliente/Campo";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
-import { IconeComanda } from "@/components/icones";
+import { IconeCheck, IconeComanda } from "@/components/icones";
 import CardPedido, { CarregandoLista } from "@/components/pedidos/CardPedido";
 import { useMeusPedidos } from "@/components/pedidos/useMeusPedidos";
+import { usePedidosAoVivo } from "@/components/pagamento/usePedidosAoVivo";
 
 export default function MeusPedidos() {
   const { estado, usuarioId } = useCliente();
   const { pedidos, erro, carregando, recarregar } = useMeusPedidos(estado === "logado" ? usuarioId : null);
   const [atualizando, setAtualizando] = useState(false);
+  const [confirmado, setConfirmado] = useState(null); // nº do pedido que acabou de ser pago
+
+  // Tempo real: o admin confirmou o pagamento (ou o pedido mudou): recarrega e avisa.
+  usePedidosAoVivo(estado === "logado", (linha) => {
+    const antes = pedidos.find((p) => p.id === linha.id);
+    if (linha.pagamento_status === "pago" && antes?.pagamento_status === "pendente") setConfirmado(linha.id);
+    recarregar();
+  });
 
   if (estado === "carregando") {
     return (
@@ -45,7 +54,7 @@ export default function MeusPedidos() {
     <div className="pt-5">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <h1 className="font-titulo text-[28px] leading-tight text-ferrugem">Meus pedidos</h1>
+          <h1 className="traco-vinho font-titulo text-[28px] leading-tight text-ferrugem">Meus pedidos</h1>
           <p className="text-sm text-texto-suave">Acompanhe o andamento das suas encomendas.</p>
         </div>
         <button
@@ -57,6 +66,13 @@ export default function MeusPedidos() {
           {atualizando ? "Atualizando…" : "Atualizar"}
         </button>
       </div>
+
+      {confirmado && (
+        <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-sucesso-fundo px-3 py-2.5 text-sm font-semibold text-sucesso">
+          <IconeCheck className="mt-px size-5 shrink-0" />
+          <span>Pagamento confirmado! Seu agendamento está garantido. (Pedido nº {confirmado})</span>
+        </p>
+      )}
 
       {carregando ? (
         <CarregandoLista />

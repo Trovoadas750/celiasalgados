@@ -15,20 +15,17 @@ export default function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-20 fundo-escuro bg-cafe text-creme shadow-md">
+    <header className="sticky top-0 z-20 fundo-escuro border-b-4 border-vinho bg-cafe text-creme shadow-md">
       <div className="mx-auto flex h-16 max-w-2xl items-center gap-2 px-3">
-        <Link href="/" className="flex min-w-0 items-center gap-2">
+        <Link href="/" className="flex shrink-0 items-center">
           <Image
-            src="/logo.webp"
+            src="/logo2.png"
             alt="Edna & Célia Salgados"
-            width={48}
-            height={48}
-            priority
-            className="size-12 shrink-0 object-contain drop-shadow"
+            width={726}
+            height={344}
+            preload
+            className="h-10 w-auto object-contain md:h-12"
           />
-          <span className="hidden font-titulo text-lg leading-tight text-creme min-[440px]:block">
-            Edna &amp; Célia
-          </span>
         </Link>
 
         <nav className="ml-auto flex items-stretch" aria-label="Principal">

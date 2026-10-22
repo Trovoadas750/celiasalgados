@@ -23,7 +23,7 @@ export default function Entrar() {
 
   return (
     <div className="mx-auto max-w-md pt-6">
-      <h1 className="font-titulo text-[28px] leading-tight text-ferrugem">
+      <h1 className="traco-vinho font-titulo text-[28px] leading-tight text-ferrugem">
         {modo === "cadastro" ? "Crie sua conta" : "Entre na sua conta"}
       </h1>
       <p className="mb-5 mt-1 text-sm text-texto-suave">

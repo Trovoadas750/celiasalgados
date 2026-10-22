@@ -29,8 +29,10 @@ function Opcao({ titulo, texto, onClick }) {
  *  - modo "escolha": convidado ou conta
  *  - modo "convidado": nome, sobrenome e telefone (lembrados só neste navegador)
  *  - modo "conta": entrar / criar conta sem sair do checkout
+ *  - exigeConta (vai agendar sem login): só entrar / criar conta; convidado não agenda
+ *    (`abaConta` escolhe a aba aberta: "entrar" ou "cadastro")
  */
-export default function BlocoIdentificacao({ modo, setModo, valores, setValores, erros, erroModo }) {
+export default function BlocoIdentificacao({ modo, setModo, valores, setValores, erros, erroModo, exigeConta = false, abaConta = "entrar" }) {
   const { estado, dados, convidado, limparConvidado, sair } = useCliente();
 
   if (estado === "carregando") {
@@ -56,10 +58,22 @@ export default function BlocoIdentificacao({ modo, setModo, valores, setValores,
     );
   }
 
+  if (exigeConta) {
+    return (
+      <div className="rounded-xl bg-superficie p-4 ring-1 ring-borda-suave">
+        <p className="mb-4 flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2.5 text-sm font-semibold text-info">
+          <IconeCracha className="mt-px size-5 shrink-0" />
+          <span>Para agendar, entre na sua conta ou crie uma. Seu pedido fica salvo no seu perfil.</span>
+        </p>
+        <AcessoConta key={abaConta} modoInicial={abaConta} />
+      </div>
+    );
+  }
+
   if (modo === "conta") {
     return (
       <div className="rounded-xl bg-superficie p-4 ring-1 ring-borda-suave">
-        <AcessoConta />
+        <AcessoConta key={abaConta} modoInicial={abaConta} />
         <button
           type="button"
           onClick={() => setModo("convidado")}

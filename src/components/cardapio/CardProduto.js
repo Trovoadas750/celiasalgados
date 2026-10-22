@@ -40,11 +40,11 @@ export function CardPacote({ pacote }) {
       type="button"
       onClick={() => abrirMontador({ pacoteId: pacote.id })}
       aria-label={`Montar ${pacote.nome}, a partir de ${formatarPreco(pacote.preco)}`}
-      className="flex w-full items-start gap-4 bg-superficie p-5 text-left transition hover:bg-fundo"
+      className="flex w-full items-start gap-4 bg-superficie p-5 text-left transition hover:bg-fundo hover:shadow-[inset_3px_0_0_var(--vinho)]"
     >
       <Textos
         titulo={pacote.nome}
-        descricao={pacote.descricao || (pacote.max_sabores ? `Escolha até ${pacote.max_sabores} sabores` : null)}
+        descricao={pacote.descricao || (pacote.max_sabores ? `Escolha até ${pacote.max_sabores} qualidades` : null)}
         preco={
           <>
             A partir de <span className="font-semibold tabular-nums">{formatarPreco(pacote.preco)}</span>

@@ -12,28 +12,60 @@ import { useFrete } from "@/components/checkout/ResumoFrete";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
-import { IconeMotoboy, IconeRetirada } from "@/components/icones";
+import { IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { esvaziar, itensParaPedido, juntarObservacoes, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
 import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
 import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
 import { formatarPreco, MODO_PACOTE } from "@/lib/formatar";
 import { LOJA } from "@/lib/loja";
-import { iniciarPagamento } from "@/lib/pagamento";
-import { criarPedido } from "@/lib/pedidos";
+import { criarPedido, MSG_AGENDAR_SEM_CONTA } from "@/lib/pedidos";
 import { mascararTelefone, soDigitos, temErros, validar } from "@/lib/validacao";
 
-function Secao({ numero, titulo, children }) {
+function Secao({ id, numero, titulo, children }) {
   return (
-    <section className="pt-6">
+    <section id={id} className="scroll-mt-24 pt-6">
       <h2 className="mb-3 flex items-center gap-2 font-titulo text-xl text-ferrugem-hover">
-        <span className="grid size-7 place-items-center rounded-full bg-ferrugem font-sans text-sm font-bold text-white">
+        <span className="grid size-7 place-items-center rounded-full bg-vinho font-sans text-sm font-bold text-creme">
           {numero}
         </span>
         {titulo}
       </h2>
       {children}
     </section>
+  );
+}
+
+// Agendar exige conta (banco-de-dados.md, seção 1). Os botões abrem o login/cadastro na seção
+// "Seus dados", sem sair da página: sacola e escolhas continuam como estão.
+function AvisoContaParaAgendar({ erro, aoEscolher }) {
+  return (
+    <div
+      role={erro ? "alert" : "status"}
+      data-erro={erro ? true : undefined}
+      className={`rounded-xl bg-info-fundo p-3 text-info ${erro ? "ring-2 ring-info" : ""}`}
+    >
+      <p className="flex items-start gap-2 text-sm font-semibold">
+        <IconeCracha className="mt-px size-5 shrink-0" />
+        <span>Para agendar, entre na sua conta ou crie uma. Seu pedido fica salvo no seu perfil.</span>
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2 pl-7">
+        <button
+          type="button"
+          onClick={() => aoEscolher("entrar")}
+          className="h-11 rounded-xl bg-ferrugem px-3 text-sm font-bold text-white transition hover:bg-ferrugem-hover active:bg-ferrugem-ativo"
+        >
+          Entrar
+        </button>
+        <button
+          type="button"
+          onClick={() => aoEscolher("cadastro")}
+          className="h-11 rounded-xl bg-superficie px-3 text-sm font-bold text-link ring-2 ring-link transition hover:text-ferrugem-ativo hover:ring-ferrugem-ativo"
+        >
+          Criar conta
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -82,6 +114,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   const logado = cliente.estado === "logado";
 
   const [modo, setModo] = useState(cliente.convidado ? "convidado" : "escolha");
+  const [abaConta, setAbaConta] = useState("entrar"); // aba do login/cadastro dentro do checkout
   const [convidado, setConvidado] = useState(() => ({
     nome: cliente.convidado?.nome ?? "",
     sobrenome: cliente.convidado?.sobrenome ?? "",
@@ -115,6 +148,18 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
   const comEntrega = recebimento === "entrega";
   const frete = useFrete(comEntrega, endereco);
+
+  // Agendamento (escolhido ou obrigatório) sem login de cliente: precisa entrar ou criar conta.
+  const vaiAgendar = exigeAgendamento || quando.tipo === "agendar";
+  const precisaConta = vaiAgendar && !logado;
+
+  // Abre o login/cadastro na seção "Seus dados" (sem trocar de página).
+  function abrirConta(aba) {
+    setAbaConta(aba);
+    setModo("conta");
+    if (erros.modo) setErros(({ modo: _modo, ...resto }) => resto);
+    requestAnimationFrame(() => document.getElementById("secao-dados")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   // Ao mudar um campo, some o erro só daquele campo (os outros continuam até serem corrigidos).
   function semErroAoMudar(atual, setValor) {
@@ -152,7 +197,8 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
     };
     if (!recebimento) novos.recebimento = "Escolha entrega ou retirada no local.";
     if (comEntrega && frete?.status === "fora_da_area") novos.rua = "Ainda não entregamos nesse endereço.";
-    if (!logado) {
+    if (precisaConta) novos.conta = MSG_AGENDAR_SEM_CONTA;
+    else if (!logado) {
       if (modo === "convidado") Object.assign(novos, validar(convidado, ["nome", "sobrenome", "telefone"]));
       else if (modo === "conta") novos.modo = "Entre ou crie sua conta para continuar (ou siga como convidado).";
       else novos.modo = "Escolha como quer continuar.";
@@ -187,6 +233,12 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       });
     } catch (erro) {
       setEnviando(false);
+      if (erro.exigeConta) {
+        // O banco recusou o agendamento sem conta: mesmo caminho do aviso (abre o login).
+        setErros({ conta: MSG_AGENDAR_SEM_CONTA });
+        abrirConta("entrar");
+        return;
+      }
       setErroGeral(erro.message); // P0001 já vem em português
       return;
     }
@@ -199,8 +251,9 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
         telefone: soDigitos(convidado.telefone),
       });
     }
-    await iniciarPagamento({ ...pedido, forma: pagamento.forma });
     // Confirma antes de esvaziar: a tela de sucesso não pode cair no estado "sacola vazia".
+    // Os dados extras (cliente, itens, observação) montam a mensagem do WhatsApp do agendamento.
+    const quem = logado ? cliente.dados : { ...convidado, telefone: soDigitos(convidado.telefone) };
     aoConfirmar({
       ...pedido,
       tipoEntrega: recebimento,
@@ -208,6 +261,16 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       forma: pagamento.forma,
       endereco: comEntrega ? endereco : null,
       comoConvidado: !logado,
+      nome: quem.nome.trim(),
+      sobrenome: quem.sobrenome.trim(),
+      telefone: quem.telefone,
+      itens: itens.map(({ quantidade, nome, modo: modoItem, sabores }) => ({
+        quantidade,
+        nome,
+        modo: modoItem,
+        sabores: sabores?.map((s) => ({ nome: s.nome, quantidade: s.quantidade })),
+      })),
+      observacao: observacaoFinal,
     });
     esvaziar();
   }
@@ -216,8 +279,10 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
   return (
     <form onSubmit={finalizar} noValidate>
-      <Secao numero={1} titulo="Seus dados">
+      <Secao id="secao-dados" numero={1} titulo="Seus dados">
         <BlocoIdentificacao
+          exigeConta={precisaConta}
+          abaConta={abaConta}
           modo={modo}
           setModo={(novo) => {
             setModo(novo);
@@ -254,6 +319,11 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
           exige={exigeAgendamento}
           comEntrega={comEntrega}
         />
+        {precisaConta && (
+          <div className="mt-3">
+            <AvisoContaParaAgendar erro={Boolean(erros.conta)} aoEscolher={abrirConta} />
+          </div>
+        )}
       </Secao>
 
       <Secao numero={4} titulo="Pagamento">
@@ -359,7 +429,7 @@ export default function Checkout() {
   if (itens.length === 0) {
     return (
       <div className="pt-12 text-center">
-        <h1 className="font-titulo text-[26px] text-ferrugem">Sua sacola está vazia</h1>
+        <h1 className="traco-vinho font-titulo text-[26px] text-ferrugem">Sua sacola está vazia</h1>
         <p className="mt-1 text-sm text-texto-suave">Monte um pacote no cardápio para fazer um pedido.</p>
         <Link href="/" className={`${CLASSE_BOTAO_PRINCIPAL} mx-auto mt-5 max-w-56`}>
           Ver o cardápio
@@ -370,7 +440,7 @@ export default function Checkout() {
 
   return (
     <div className="pt-5">
-      <h1 className="font-titulo text-[28px] leading-tight text-ferrugem">Finalizar pedido</h1>
+      <h1 className="traco-vinho font-titulo text-[28px] leading-tight text-ferrugem">Finalizar pedido</h1>
       <div className="mb-2 mt-3 flex items-center justify-between">
         <h2 className="text-sm font-bold uppercase tracking-wide text-texto-suave">Seu pedido</h2>
         <Link href="/" className="text-sm font-semibold text-link underline underline-offset-4 hover:text-ferrugem-ativo">

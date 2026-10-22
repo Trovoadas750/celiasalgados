@@ -11,6 +11,7 @@
   --cobre: #BC6E40;
   --cafe: #251C14;
   --preto: #000000;
+  --vinho: #5D1C1A;
 
   /* apoio */
   --creme-claro: #FAF0E8;
@@ -55,6 +56,7 @@
   --color-cobre: var(--cobre);
   --color-cafe: var(--cafe);
   --color-preto: var(--preto);
+  --color-vinho: var(--vinho);
 
   --color-creme-claro: var(--creme-claro);
   --color-borda-suave: var(--borda-suave);
@@ -87,6 +89,9 @@
 
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
   --font-titulo: var(--font-young-serif), Georgia, serif;
+  /* fontes só do banner da home */
+  --font-banner: var(--font-playfair), Georgia, serif;
+  --font-manuscrita: var(--font-dancing), cursive;
 }
 
 html {
@@ -125,6 +130,11 @@ select {
   outline-color: var(--laranja);
 }
 
+/* Trecho claro dentro de uma área escura (ex.: status da loja e caixa de horários no banner do celular): anel volta ao café. */
+.fundo-escuro .fundo-claro :focus-visible {
+  outline-color: var(--foco);
+}
+
 /* Campo de busca: o anel aparece no contorno inteiro (focus-within no label), não no input interno. */
 .campo-busca:focus-visible {
   outline: none;
@@ -160,9 +170,9 @@ label:has(> input.sr-only:focus-visible) {
   background: radial-gradient(circle, var(--ferrugem) 0 45%, var(--superficie) 50%);
 }
 
-/* Capa: café com bolinhas cobre (decorativo, sem texto em cima) */
+/* Capa: vinho com bolinhas cobre (decorativo, sem texto em cima) */
 .capa {
-  background-color: var(--cafe);
+  background-color: var(--vinho);
   background-image:
     radial-gradient(circle at 20% 30%, var(--cobre) 2px, transparent 2.5px),
     radial-gradient(circle at 70% 80%, var(--cobre) 1.5px, transparent 2px);
@@ -201,4 +211,30 @@ dialog.sheet::backdrop {
   *::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Tracinho vinho sob títulos (paletas.md: vinho só em detalhes finos) */
+.traco-vinho::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  margin-top: 0.375rem;
+  border-radius: 9999px;
+  background: var(--vinho);
+}
+
+/* Em blocos centralizados, o tracinho também fica no centro */
+.text-center .traco-vinho::after {
+  margin-inline: auto;
+}
+
+/* ==========================================================================
+   Banner da home (components/BannerInicio.js)
+   Só no desktop (no celular o banner é só a foto). Café (#251C14) a 88% atrás do texto:
+   mesmo com pixel branco na foto, creme fica em 8.93:1 e laranja em 5.31:1.
+   ========================================================================== */
+/* Desktop: da esquerda para a direita, sólido atrás da coluna de texto (5vw + 36vw) */
+.banner-sombra {
+  background: linear-gradient(to right, rgba(37, 28, 20, 0.88) 0, rgba(37, 28, 20, 0.88) 40vw, rgba(37, 28, 20, 0) 56vw);
 }

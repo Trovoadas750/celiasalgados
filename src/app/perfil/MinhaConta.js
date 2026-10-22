@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -7,9 +8,11 @@ import AvisoConta from "@/components/cliente/AvisoConta";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL, CLASSE_BOTAO_SECUNDARIO } from "@/components/cliente/estilos";
-import { IconeCheck, IconeCracha } from "@/components/icones";
+import EscolherAvatar from "@/components/cliente/EscolherAvatar";
+import { IconeCheck, IconeCracha, IconeLapis } from "@/components/icones";
 import CardPedido, { CarregandoLista } from "@/components/pedidos/CardPedido";
 import { useMeusPedidos } from "@/components/pedidos/useMeusPedidos";
+import { caminhoDoAvatar } from "@/lib/avatar";
 import { formatarTelefone } from "@/lib/formatar";
 import { temErros, validar } from "@/lib/validacao";
 
@@ -79,9 +82,10 @@ function FormNome({ dados, atualizarNome }) {
 
 export default function MinhaConta() {
   const router = useRouter();
-  const { estado, dados, usuarioId, atualizarNome, sair } = useCliente();
+  const { estado, dados, usuarioId, avatar, trocarAvatar, atualizarNome, sair } = useCliente();
   const { pedidos, erro, carregando } = useMeusPedidos(estado === "logado" ? usuarioId : null, 3);
   const [saindo, setSaindo] = useState(false);
+  const [trocandoAvatar, setTrocandoAvatar] = useState(false);
 
   if (estado === "carregando") {
     return (
@@ -109,32 +113,61 @@ export default function MinhaConta() {
     router.replace("/");
   }
 
-  const iniciais = `${dados.nome[0] ?? ""}${dados.sobrenome[0] ?? ""}`.toUpperCase();
-
   return (
     <div className="pt-5">
-      <h1 className="font-titulo text-[28px] text-ferrugem">Minha conta</h1>
+      <h1 className="traco-vinho font-titulo text-[28px] text-ferrugem">Minha conta</h1>
 
       <section className="mt-4 overflow-hidden rounded-2xl bg-superficie ring-1 ring-borda-suave">
         <div className="capa h-16" />
-        <div className="-mt-8 flex items-end gap-3 px-4">
-          <span className="grid size-16 shrink-0 place-items-center rounded-full bg-ferrugem font-titulo text-xl text-white ring-4 ring-superficie">
-            {iniciais}
-          </span>
-          <div className="min-w-0 pb-1">
-            <p className="truncate text-lg font-bold">
-              {dados.nome} {dados.sobrenome}
-            </p>
-            <p className="text-sm tabular-nums text-texto-suave">{formatarTelefone(dados.telefone)}</p>
-          </div>
+        {/* Avatar sobre a capa; nome e celular embaixo, no fundo claro (café sobre creme-claro: 14.90) */}
+        <div className="-mt-10 px-4">
+          {/* Clicar no avatar abre a grade para escolher outro */}
+          <button
+            type="button"
+            onClick={() => setTrocandoAvatar(!trocandoAvatar)}
+            aria-expanded={trocandoAvatar}
+            aria-label="Trocar avatar"
+            className="relative rounded-full transition hover:scale-[1.03]"
+          >
+            <Image
+              src={caminhoDoAvatar(avatar)}
+              alt=""
+              width={80}
+              height={80}
+              unoptimized
+              className="size-20 rounded-full ring-4 ring-superficie"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-0.5 -right-0.5 grid size-7 place-items-center rounded-full bg-ferrugem text-white ring-2 ring-superficie"
+            >
+              <IconeLapis className="size-4" />
+            </span>
+          </button>
+          <p className="mt-2 truncate text-xl font-bold text-texto">
+            {dados.nome} {dados.sobrenome}
+          </p>
+          <p className="text-sm tabular-nums text-texto-suave">{formatarTelefone(dados.telefone)}</p>
+          {!trocandoAvatar && (
+            <button
+              type="button"
+              onClick={() => setTrocandoAvatar(true)}
+              className="mt-1 text-sm font-semibold text-link underline underline-offset-4 hover:text-ferrugem-ativo"
+            >
+              Trocar avatar
+            </button>
+          )}
         </div>
+        {trocandoAvatar && (
+          <EscolherAvatar atual={avatar} trocarAvatar={trocarAvatar} aoFechar={() => setTrocandoAvatar(false)} />
+        )}
         {/* key: se o nome mudar em outra aba/sessão, o formulário reinicia com os dados novos */}
         <FormNome key={`${dados.nome}|${dados.sobrenome}`} dados={dados} atualizarNome={atualizarNome} />
       </section>
 
       <section className="mt-6">
         <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-titulo text-[22px] text-ferrugem-hover">Últimos pedidos</h2>
+          <h2 className="traco-vinho font-titulo text-[22px] text-ferrugem-hover">Últimos pedidos</h2>
           <Link href="/pedidos" className="text-sm text-link underline underline-offset-4 hover:text-ferrugem-ativo">
             Ver todos
           </Link>

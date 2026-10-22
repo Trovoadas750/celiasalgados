@@ -5,10 +5,10 @@ import { CardPacote } from "./CardProduto";
 export default function SecaoPacotes({ pacotes }) {
   return (
     <section id="pacotes" aria-labelledby="titulo-pacotes" className="scroll-mt-20 pt-6">
-      <h2 id="titulo-pacotes" className="font-titulo text-[24px] leading-tight text-ferrugem">
-        Escolha seu pacote
+      <h2 id="titulo-pacotes" className="traco-vinho font-titulo text-[24px] leading-tight text-ferrugem">
+        Monte do seu jeito
       </h2>
-      <p className="mt-1 text-sm text-texto-suave">Os salgados são vendidos em pacotes. Você escolhe os sabores.</p>
+      <p className="mt-1 text-sm text-texto-suave">Os salgados são vendidos em pacotes. Você escolhe as qualidades.</p>
 
       {pacotes.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-superficie px-4 py-6 text-center text-texto-suave ring-1 ring-borda-suave">

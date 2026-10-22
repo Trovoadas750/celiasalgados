@@ -1,6 +1,11 @@
-// Estrutura de pagamento. A integração com gateway (Pix online, cartão online) ainda não existe:
-// hoje o pedido só registra a forma escolhida em `pedidos.forma_pagamento` e o pagamento é
-// combinado na entrega ou na retirada. Quando o gateway entrar, a chamada vai em `iniciarPagamento`.
+// Estrutura de pagamento. O pagamento online AINDA NÃO EXISTE.
+//
+// Pedido "agora": pagamento_status = 'nao_exigido'; paga na entrega ou na retirada (forma_pagamento).
+// Pedido agendado: nasce 'pendente' e só vira 'pago' quando confirmado. Hoje quem confirma é o admin
+// (confirmar_pagamento). No futuro, o webhook do provedor confirma no servidor, com a chave secreta.
+// O front do cliente NUNCA confirma pagamento.
+
+import { linkWhatsappLoja, mensagemPagarAgendamento } from "./mensagemWhatsapp";
 
 // Valores aceitos pela coluna `pedidos.forma_pagamento`.
 // `detalhe` recebe o momento do pagamento: "na entrega" ou "na retirada".
@@ -11,15 +16,16 @@ export const FORMAS_PAGAMENTO = [
 ];
 
 /**
- * Chamado logo depois de `criar_pedido` dar certo.
- * @param {{ numero: number, total: number, forma: "pix" | "dinheiro" | "cartao" }} pedido
- * @returns {Promise<{ status: "na_entrega" | "aguardando" | "pago", instrucoes?: string }>}
+ * Ponto de extensão do botão "Pagar agora" (modal de pagamento).
  *
- * TODO(gateway): para "pix", gerar a cobrança no gateway e devolver { status: "aguardando", qrCode, copiaECola }.
- * A chave secreta do gateway NUNCA pode ir para o navegador: essa chamada deve passar por uma
- * rota do servidor (Route Handler) que fala com o gateway.
+ * @param {{ numero: number, total: number }} pedido  agendamento com pagamento pendente
+ * @returns {Promise<{ tipo: "whatsapp", link: string }>}
+ *
+ * TODO(provedor): quando houver pagamento online, criar a cobrança por uma rota do servidor
+ * (ex.: app/api/pagamentos/route.js, com a chave do provedor só no servidor) e devolver
+ * { tipo: "online", qrCode, copiaECola } ou { tipo: "redirecionar", url }. O webhook do provedor
+ * chama confirmar_pagamento no servidor; o site recebe a confirmação pelo realtime.
  */
 export async function iniciarPagamento(pedido) {
-  void pedido;
-  return { status: "na_entrega" };
+  return { tipo: "whatsapp", link: linkWhatsappLoja(mensagemPagarAgendamento(pedido)) };
 }

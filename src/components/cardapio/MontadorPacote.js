@@ -36,7 +36,7 @@ function Secao({ titulo, subtitulo, contagem, maximo, completa, children }) {
   const id = useId();
   return (
     <section aria-labelledby={id}>
-      <div className="sticky top-14 z-10 flex items-center justify-between gap-3 border-y border-borda-suave bg-fundo px-4 py-3">
+      <div className="sticky top-14 z-10 flex items-center justify-between gap-3 border-y border-l-4 border-borda-suave border-l-vinho bg-fundo px-4 py-3">
         <div className="min-w-0">
           <h3 id={id} className="font-bold leading-snug text-texto">
             {titulo}
@@ -44,7 +44,7 @@ function Secao({ titulo, subtitulo, contagem, maximo, completa, children }) {
           <p className="text-sm text-texto-suave">{subtitulo}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className={`${BADGE} ${completa ? "bg-sucesso-fundo text-sucesso" : "bg-cafe text-creme"}`}>
+          <span className={`${BADGE} ${completa ? "bg-sucesso-fundo text-sucesso" : "bg-vinho text-creme"}`}>
             {contagem}/{maximo}
           </span>
           {completa ? (
@@ -53,7 +53,7 @@ function Secao({ titulo, subtitulo, contagem, maximo, completa, children }) {
               <span className="sr-only">Completo</span>
             </span>
           ) : (
-            <span className={`${BADGE} bg-cafe text-creme`}>OBRIGATÓRIO</span>
+            <span className={`${BADGE} bg-vinho text-creme`}>OBRIGATÓRIO</span>
           )}
         </div>
       </div>
@@ -184,12 +184,12 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
 
         <h2
           id="titulo-montador"
-          className="sticky top-0 z-20 flex h-14 items-center truncate bg-superficie pl-4 pr-16 text-[18px] font-bold text-texto"
+          className="sticky top-0 z-20 flex h-14 items-center truncate border-b-2 border-vinho bg-superficie pl-4 pr-16 text-[18px] font-bold text-texto"
         >
           <span className="truncate">{pacote.nome}</span>
         </h2>
         <div className="px-4 pb-4">
-          <p className="text-texto-suave">{pacote.descricao || `Escolha até ${maximo} sabores`}</p>
+          <p className="text-texto-suave">{pacote.descricao || `Escolha até ${maximo} qualidades`}</p>
           <p className="mt-1 text-texto">
             A partir de <span className="font-semibold tabular-nums">{formatarPreco(pacote.preco)}</span>
           </p>
@@ -214,8 +214,8 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
         </Secao>
 
         <Secao
-          titulo="Sabores"
-          subtitulo={`Escolha até ${maximo} ${maximo === 1 ? "opção" : "opções"}`}
+          titulo="Qualidades"
+          subtitulo={`Escolha até ${maximo} ${maximo === 1 ? "qualidade" : "qualidades"}`}
           contagem={escolhidos.length}
           maximo={maximo}
           completa={escolhidos.length > 0}
@@ -224,7 +224,7 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
           {modo && noLimite && (
             <p className="mx-4 mt-3 flex items-center gap-2 rounded-xl bg-info-fundo px-3 py-2 text-sm font-medium text-info">
               <IconeAlerta className="size-4 shrink-0" />
-              Máximo de {maximo} sabores
+              Máximo de {maximo} qualidades
             </p>
           )}
           {GRUPOS.map(({ tipo, titulo }) => {
@@ -272,7 +272,7 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
             maxLength={LIMITE_OBSERVACAO}
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
-            placeholder="Ex.: separar os sabores em embalagens diferentes"
+            placeholder="Ex.: separar as qualidades em embalagens diferentes"
             className="min-h-24 w-full rounded-xl bg-superficie px-3 py-2.5 text-texto ring-1 ring-borda-input placeholder:text-texto-suave"
           />
         </div>

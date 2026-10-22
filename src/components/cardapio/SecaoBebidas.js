@@ -4,7 +4,7 @@ import { CardBebida } from "./CardProduto";
 export default function SecaoBebidas({ refrigerantes }) {
   return (
     <section id="bebidas" aria-labelledby="titulo-bebidas" className="scroll-mt-20 pt-8">
-      <h2 id="titulo-bebidas" className="font-titulo text-[24px] leading-tight text-ferrugem">
+      <h2 id="titulo-bebidas" className="traco-vinho font-titulo text-[24px] leading-tight text-ferrugem">
         Bebidas
       </h2>
 

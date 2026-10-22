@@ -2,7 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase, supabaseConfigurado } from "@/lib/supabase";
-import { atualizarNome as atualizarNomeNoBanco, buscarCliente, sair as sairDoSupabase } from "@/lib/conta";
+import { avatarDoUsuario } from "@/lib/avatar";
+import {
+  atualizarAvatar as atualizarAvatarNoAuth,
+  atualizarNome as atualizarNomeNoBanco,
+  buscarCliente,
+  sair as sairDoSupabase,
+} from "@/lib/conta";
 import {
   lerConvidado,
   limparConvidado as limparConvidadoLocal,
@@ -96,6 +102,16 @@ export function ClienteProvider({ children }) {
     [usuario],
   );
 
+  const trocarAvatar = useCallback(
+    async (numero) => {
+      if (!usuario) return { erro: "Você não está logado." };
+      const { usuario: atualizado, erro } = await atualizarAvatarNoAuth(numero);
+      if (atualizado) setUsuario(atualizado);
+      return { erro };
+    },
+    [usuario],
+  );
+
   const valor = useMemo(() => {
     let estado = "visitante";
     let dados = null;
@@ -111,6 +127,8 @@ export function ClienteProvider({ children }) {
       estado,
       dados,
       usuarioId: usuario?.id ?? null,
+      avatar: avatarDoUsuario(usuario), // 1 a 10 (lib/avatar.js), ou null sem login
+      trocarAvatar,
       clienteDesde: cliente?.criado_em ?? null,
       convidado,
       salvarConvidado,
@@ -118,7 +136,7 @@ export function ClienteProvider({ children }) {
       sair,
       atualizarNome,
     };
-  }, [carregando, usuario, cliente, convidado, salvarConvidado, limparConvidado, sair, atualizarNome]);
+  }, [carregando, usuario, cliente, convidado, salvarConvidado, limparConvidado, sair, atualizarNome, trocarAvatar]);
 
   return <ClienteContext.Provider value={valor}>{children}</ClienteContext.Provider>;
 }

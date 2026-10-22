@@ -20,6 +20,7 @@ Este arquivo define **as cores do site e como combiná-las**. Siga as regras aba
 | `--cobre` | `#BC6E40` | Cobre | **Somente decorativo**: ilustrações, divisores, ícones ao lado de texto |
 | `--cafe` | `#251C14` | Café | **Texto principal**; fundo de header/rodapé escuro |
 | `--preto` | `#000000` | Preto | Uso mínimo: sombras e sobreposição de imagens (`rgba(0,0,0,.x)`) |
+| `--vinho` | `#5D1C1A` | Vinho | **Detalhes e acentos**: fios de borda (header, rodapé, sacola, montador), tracinho sob títulos, filetes laterais, capa decorativa, selos e bolinhas (com texto creme). Nunca em botão de ação: ação continua ferrugem/laranja |
 
 ## 2. Cores de apoio (derivadas, já validadas)
 
@@ -65,6 +66,7 @@ Este arquivo define **as cores do site e como combiná-las**. Siga as regras aba
 | **cobre-esc** `#8F5230` | ✅ 4.61 | ✅ 5.47 | ❌ | — | — |
 | **texto-sec** `#5C4636` | ✅ 6.61 | ✅ 7.84 | ❌ | — | — |
 | **preto** `#000000` | ✅ 15.75 | — | ❌ 1.25 | — | ✅ 9.37 |
+| **vinho** `#5D1C1A` | ✅ 9.57 | ✅ 11.35 | ❌ 1.31 | — | — |
 
 ### Regras que saem dessa tabela
 1. **Laranja nunca é cor de texto sobre fundo claro** (1.68). No fundo claro, laranja só aparece como **fundo**, com texto **café** por cima.
@@ -74,6 +76,7 @@ Este arquivo define **as cores do site e como combiná-las**. Siga as regras aba
 5. **Cobre é só decoração.** Para texto num tom cobre, use `--cobre-esc`.
 6. **Texto principal é café, não preto.** O preto puro sobre creme cansa a vista, e preto sobre café é invisível (1.25).
 7. **Fundo café** (header/rodapé): texto creme ou branco; destaque em laranja (7.47). Ferrugem sobre café é proibido (2.87).
+8. **Vinho é cor de detalhe e acento.** Sobre café ele quase some (1.31): use como fio de borda no header/rodapé. Sobre creme contrasta bem (9.57), em traços de 2–4px. Como **fundo** pequeno (selo, bolinha, avatar, botão flutuante do WhatsApp, capa), leva texto/ícone **creme** (9.57) ou **branco** (12.75); laranja sobre vinho passa (5.69). Nunca use vinho em botão de ação (para não competir com a ferrugem).
 
 ---
 
@@ -88,6 +91,7 @@ Este arquivo define **as cores do site e como combiná-las**. Siga as regras aba
   --cobre: #BC6E40;
   --cafe: #251C14;
   --preto: #000000;
+  --vinho: #5D1C1A;
 
   /* apoio */
   --creme-claro: #FAF0E8;
@@ -134,7 +138,13 @@ body {
 | componente | fundo | texto | borda / extra |
 |---|---|---|---|
 | Página | `--creme` | `--cafe` | — |
-| Card de produto | `--creme-claro` | `--cafe`; descrição `--texto-sec` | `1px solid --borda-suave`; sombra opcional `0 2px 8px rgba(37,28,20,.08)` |
+| Título de seção (h2) | — | `--ferrugem` (texto grande) | tracinho `--vinho` embaixo (3px × 40px): classe `.traco-vinho`, também nos h1 das páginas |
+| Cabeçalho de etapa no montador | `--creme` | `--cafe` | `border-left 4px --vinho`; selos "OBRIGATÓRIO" e contagem: fundo `--vinho`, texto `--creme`; nome do pacote com `border-bottom 2px --vinho` |
+| Capa (home e perfil) | `--vinho` com bolinhas `--cobre` | sem texto | — |
+| Sacola (bottom sheet) | `--creme` | `--cafe` | `border-top 4px --vinho`; alça `--vinho` |
+| Card de pedido | `--creme-claro` | `--cafe` | `border-left 4px --vinho` + `1px --borda-suave` |
+| Bolinhas de destaque (nº da etapa no checkout, avatar, botão do WhatsApp) | `--vinho` | `--creme` | — |
+| Card de produto | `--creme-claro` | `--cafe`; descrição `--texto-sec` | `1px solid --borda-suave`; sombra opcional `0 2px 8px rgba(37,28,20,.08)`; hover: filete `inset 3px 0 0 --vinho` à esquerda |
 | Preço (no card claro) | — | `--ferrugem` **em negrito ≥ 18.66px** ou `--cafe` | — |
 | **Botão principal** ("Finalizar pedido", "Entrar") | `--ferrugem` → hover `--ferrugem-hover` → active `--ferrugem-ativo` | **branco** | — |
 | **Botão de destaque** ("Adicionar ao carrinho", selo "Mais vendido") | `--laranja` → hover `--laranja-hover` | **`--cafe`** | — |
@@ -142,7 +152,7 @@ body {
 | Link em texto | — | `--ferrugem-hover`, **sublinhado** | hover: `--ferrugem-ativo` |
 | Campo de formulário | `--creme-claro` | `--cafe`; placeholder `--texto-sec` | `1px solid --borda-input`; erro: `2px solid --erro` + mensagem em `--erro` |
 | Label | — | `--cafe` | — |
-| Header / rodapé escuro | `--cafe` | `--creme` | links `--creme` sublinhados; destaque/ícone ativo `--laranja` |
+| Header / rodapé escuro | `--cafe` | `--creme` | links `--creme` sublinhados; destaque/ícone ativo `--laranja`; fio `--vinho` (header `border-bottom 4px`, rodapé `border-top 4px` e divisor interno 1px) |
 | Contador do carrinho (bolinha) | `--laranja` | `--cafe` | — |
 | Elemento desabilitado | `--creme-claro` | `--desabilitado` | `1px solid --borda-suave`; nunca use só a cor: adicione `disabled`/`aria-disabled` |
 | Mensagens | `--*-fundo` | `--erro` / `--sucesso` / `--aviso-texto` / `--info` | ícone + texto; `role="alert"` para erro |
