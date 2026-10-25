@@ -60,7 +60,7 @@ export default function FormEndereco({ valores, setValores, erros, aoSairDoCampo
           opcional
           inputMode="numeric"
           autoComplete="postal-code"
-          placeholder="19914-300"
+          placeholder="Digite o CEP"
           maxLength={9}
           value={valores.cep ?? ""}
           onChange={(e) => mudarCep(e.target.value)}
