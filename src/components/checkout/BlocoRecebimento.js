@@ -3,7 +3,7 @@
 import { MensagemErro } from "@/components/cliente/Campo";
 import { IconeAlerta, IconeCheck, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
-import { LOJA } from "@/lib/loja";
+import { useEnderecoLoja } from "@/lib/configLoja";
 import FormEndereco from "./FormEndereco";
 import ResumoFrete from "./ResumoFrete";
 
@@ -57,6 +57,7 @@ function CartaoOpcao({ tipo, selecionado, onEscolher, desabilitado }) {
 
 /**
  * Entrega x retirada (escolha obrigatória: nenhuma vem marcada).
+ * Na entrega: endereço + frete automático (ResumoFrete). Na retirada: endereço da loja (config_loja).
  * `entregaPermitida` e `totalSalgados` vêm do calcularPedido; quando a entrega não é permitida,
  * o cartão fica desabilitado e o checkout marca a retirada sozinho (`trocadoAutomaticamente`).
  */
@@ -71,7 +72,12 @@ export default function BlocoRecebimento({
   totalSalgados,
   limiteEntrega,
   trocadoAutomaticamente,
+  totalItens,
+  total,
+  calculandoTotal,
+  aoSairDoEndereco,
 }) {
+  const enderecoLoja = useEnderecoLoja();
   return (
     <div className="space-y-3">
       <fieldset data-erro={erros.recebimento ? true : undefined}>
@@ -106,7 +112,7 @@ export default function BlocoRecebimento({
             Com essa opção o pedido <strong>não é entregue</strong> no seu endereço.
           </p>
           <p className="mt-2 text-sm">
-            Endereço para retirada: <strong>{LOJA.enderecoRetirada}</strong>
+            Endereço para retirada: <strong>{enderecoLoja ?? "carregando…"}</strong>
           </p>
           {entregaPermitida && (
             <button
@@ -123,8 +129,15 @@ export default function BlocoRecebimento({
 
       {tipo === "entrega" && (
         <>
-          <FormEndereco valores={endereco} setValores={setEndereco} erros={erros} />
-          <ResumoFrete frete={frete} />
+          <FormEndereco valores={endereco} setValores={setEndereco} erros={erros} aoSairDoCampo={aoSairDoEndereco} />
+          <ResumoFrete
+            frete={frete}
+            endereco={endereco}
+            totalItens={totalItens}
+            total={total}
+            calculandoTotal={calculandoTotal}
+            aoEscolherRetirada={() => setTipo("retirada")}
+          />
         </>
       )}
     </div>

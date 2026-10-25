@@ -119,8 +119,10 @@ function CamposDataHora({ valores, setValores, erros, limites, exige }) {
 /**
  * `exige` = resumo.exige_agendamento (há assado pronto): data obrigatória a partir de
  * resumo.data_minima_agendamento. Senão: "O quanto antes" (padrão) ou "Agendar para outro dia".
+ * `lojaFechada` = fora do horário de atendimento (resumo.loja_aberta === false): "O quanto antes"
+ * fica desabilitado com o motivo, e o checkout já marca "Agendar".
  */
-export default function BlocoEntrega({ valores, setValores, erros, limites, exige, comEntrega }) {
+export default function BlocoEntrega({ valores, setValores, erros, limites, exige, comEntrega, lojaFechada = false }) {
   if (exige) {
     return (
       <div className="space-y-3">
@@ -144,8 +146,15 @@ export default function BlocoEntrega({ valores, setValores, erros, limites, exig
         atual={valores.tipo}
         onChange={(tipo) => setValores({ ...valores, tipo })}
         titulo="O quanto antes"
-        texto="Preparamos assim que o pedido chegar."
+        texto={lojaFechada ? "Indisponível: estamos fora do horário de atendimento." : "Preparamos assim que o pedido chegar."}
+        desabilitado={lojaFechada}
       />
+      {lojaFechada && (
+        <p className="flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2.5 text-sm font-medium text-info">
+          <IconeAlerta className="mt-px size-5 shrink-0" />
+          <span>A loja está fechada agora. Agende o dia e o horário em que quer {comEntrega ? "receber" : "retirar"} seu pedido.</span>
+        </p>
+      )}
       <OpcaoRadio
         nome="quando"
         valor="agendar"

@@ -25,6 +25,12 @@ function tamanho(rotulo, min, max) {
   };
 }
 
+// "19914300" -> "19914-300" (progressivo)
+export function mascararCep(valor) {
+  const d = soDigitos(valor).slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
+
 export const REGRAS = {
   nome: tamanho("o nome", 2, 60),
   sobrenome: tamanho("o sobrenome", 2, 80),
@@ -39,6 +45,11 @@ export const REGRAS = {
   vila: tamanho("a vila/bairro", 2, 80),
   numero: tamanho("o número", 1, 10),
   ponto_referencia: tamanho("o ponto de referência", 0, 200),
+  // CEP é opcional (cidade fixa: Ourinhos); se vier, precisa ter 8 dígitos.
+  cep: (valor) => {
+    const d = soDigitos(valor);
+    return d.length === 0 || d.length === 8 ? null : "CEP com 8 dígitos (ou deixe em branco).";
+  },
   observacao: tamanho("a observação", 0, 500),
 };
 

@@ -13,8 +13,7 @@ export const LOJA = {
     link: "https://www.instagram.com/ednaeceliasalgados_/",
   },
 
-  // TODO: preencher com o endereço real da loja.
-  enderecoRetirada: "ENDEREÇO DA LOJA AQUI",
+  // Endereço da loja (retirada): vem do banco, tabela config_loja (lib/configLoja.js).
 
   // Entrega só até 100 salgados (1 cento) no pedido inteiro; acima disso, só retirada.
   // Serve para textos e avisos na tela. Quem decide de fato é o banco

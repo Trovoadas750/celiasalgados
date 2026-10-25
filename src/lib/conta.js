@@ -103,7 +103,7 @@ export async function buscarMeusPedidos(userId, { pagina = 0, porPagina = 20 } =
     .from("pedidos")
     .select(
       `id, criado_em, status, tipo_entrega, agendado_para, forma_pagamento, total, rua, vila, numero, ponto_referencia,
-      pagamento_status, pagamento_expira_em,
+      pagamento_status, pagamento_expira_em, taxa_entrega,
       itens_pedido ( id, categoria, nome_produto, modo, quantidade, preco_unitario, subtotal,
         itens_pedido_conteudo ( nome_produto, quantidade ) )`,
     )

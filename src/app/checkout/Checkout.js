@@ -8,7 +8,7 @@ import BlocoPagamento, { lerValor, validarPagamento } from "@/components/checkou
 import BlocoRecebimento from "@/components/checkout/BlocoRecebimento";
 import { ENDERECO_VAZIO } from "@/components/checkout/FormEndereco";
 import PedidoConfirmado from "@/components/checkout/PedidoConfirmado";
-import { useFrete } from "@/components/checkout/ResumoFrete";
+import { useFreteEntrega } from "@/components/checkout/ResumoFrete";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
@@ -16,7 +16,9 @@ import { IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { esvaziar, itensParaPedido, juntarObservacoes, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
 import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
+import { useEnderecoLoja } from "@/lib/configLoja";
 import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
+import { calcularFrete } from "@/lib/frete";
 import { formatarPreco, MODO_PACOTE } from "@/lib/formatar";
 import { LOJA } from "@/lib/loja";
 import { criarPedido, MSG_AGENDAR_SEM_CONTA } from "@/lib/pedidos";
@@ -140,6 +142,11 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   const exigeAgendamento = Boolean(resumo?.exige_agendamento);
   const limites = limitesData(resumo, hoje);
 
+  // Fora do horário de atendimento (loja_aberta do banco): "O quanto antes" fica bloqueado e
+  // "Agendar" é marcado sozinho.
+  const lojaFechada = resumo?.loja_aberta === false;
+  if (lojaFechada && quando.tipo === "agora") setQuando({ ...quando, tipo: "agendar" });
+
   // Entrega não permitida (mais de 100 salgados): marca retirada sozinho e avisa.
   if (resumo && !resumo.entrega_permitida && recebimento !== "retirada") {
     setRecebimento("retirada");
@@ -147,7 +154,24 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   }
 
   const comEntrega = recebimento === "entrega";
-  const frete = useFrete(comEntrega, endereco);
+  const enderecoLoja = useEnderecoLoja();
+
+  // Frete automático (/api/frete) e, com ele calculado, o resumo do banco COM frete.
+  const frete = useFreteEntrega(comEntrega, endereco);
+  const freteOk = comEntrega && frete?.status === "ok";
+  // Só consulta quando há frete calculado (sem entrega, o resumo dos itens já basta).
+  const comFrete = useCalcularPedido(
+    freteOk ? itensParaPedido(itens) : null,
+    300,
+    freteOk ? { rua: endereco.rua, numero: endereco.numero, vila: endereco.vila, chave: frete.chave } : null,
+  );
+  // Resumo que vale para os valores: com frete na entrega calculada; só itens nos outros casos.
+  const resumoFinal = freteOk ? comFrete.resumo : resumo;
+  const calculandoFinal = freteOk ? comFrete.calculando : calculando;
+  const freteDoBanco = freteOk ? comFrete.resumo?.frete : null; // { status: "ok", valor } quando pronto
+  const freteConfirmado = freteDoBanco?.status === "ok";
+  // Entrega sem frete válido (calculando, endereço incompleto, sem entrega para o endereço): bloqueia o envio.
+  const entregaSemFrete = comEntrega && !freteConfirmado;
 
   // Agendamento (escolhido ou obrigatório) sem login de cliente: precisa entrar ou criar conta.
   const vaiAgendar = exigeAgendamento || quando.tipo === "agendar";
@@ -189,14 +213,17 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
   function validarTudo() {
     const novos = {
-      ...(comEntrega ? validar(endereco, ["rua", "vila", "numero", "ponto_referencia"]) : {}),
+      ...(comEntrega ? validar(endereco, ["cep", "rua", "vila", "numero", "ponto_referencia"]) : {}),
       ...validarAgendamento(quando, exigeAgendamento, limites),
-      ...validarPagamento(pagamento, resumo?.total ?? 0),
+      // Troco comparado com o total COM frete (como o banco faz).
+      ...validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0),
       ...validar({ observacao }, ["observacao"]),
       ...validarObservacaoTotal(),
     };
     if (!recebimento) novos.recebimento = "Escolha entrega ou retirada no local.";
-    if (comEntrega && frete?.status === "fora_da_area") novos.rua = "Ainda não entregamos nesse endereço.";
+    if (comEntrega && ["nao_encontrado", "fora_da_area", "nao_configurado", "erro_temporario"].includes(frete?.status)) {
+      novos.rua = "Não conseguimos calcular a entrega para esse endereço. Combine pelo WhatsApp ou escolha retirada.";
+    }
     if (precisaConta) novos.conta = MSG_AGENDAR_SEM_CONTA;
     else if (!logado) {
       if (modo === "convidado") Object.assign(novos, validar(convidado, ["nome", "sobrenome", "telefone"]));
@@ -208,7 +235,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
   async function finalizar(e) {
     e.preventDefault();
-    if (enviando || !resumo || calculando) return; // evita pedido duplicado ou sem valores do banco
+    if (enviando || !resumoFinal || calculandoFinal) return; // evita pedido duplicado ou sem valores do banco
     const novos = validarTudo();
     setErros(novos);
     setErroGeral(null);
@@ -219,18 +246,27 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
     setEnviando(true);
     const dataAgendada = agendadoPara(quando, exigeAgendamento);
+    const dadosPedido = {
+      cliente: logado ? cliente.dados : convidado,
+      tipoEntrega: recebimento,
+      endereco: comEntrega ? endereco : null,
+      cep: comEntrega ? endereco.cep : null,
+      itens: itensParaPedido(itens),
+      agendadoPara: dataAgendada,
+      formaPagamento: pagamento.forma,
+      trocoPara: pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
+      observacao: observacaoFinal,
+    };
     let pedido;
     try {
-      pedido = await criarPedido({
-        cliente: logado ? cliente.dados : convidado,
-        tipoEntrega: recebimento,
-        endereco: comEntrega ? endereco : null,
-        itens: itensParaPedido(itens),
-        agendadoPara: dataAgendada,
-        formaPagamento: pagamento.forma,
-        trocoPara: pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
-        observacao: observacaoFinal,
-      });
+      try {
+        pedido = await criarPedido(dadosPedido);
+      } catch (erro) {
+        // O banco ainda não tinha o frete desse endereço: calcula de novo e tenta UMA vez.
+        if (!erro.precisaFrete || !comEntrega) throw erro;
+        await calcularFrete(endereco);
+        pedido = await criarPedido(dadosPedido);
+      }
     } catch (erro) {
       setEnviando(false);
       if (erro.exigeConta) {
@@ -275,7 +311,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
     esvaziar();
   }
 
-  const podeEnviar = !enviando && !calculando && Boolean(resumo) && !erroCalculo;
+  const podeEnviar = !enviando && !calculandoFinal && Boolean(resumoFinal) && !erroCalculo && !comFrete.erro && !entregaSemFrete;
 
   return (
     <form onSubmit={finalizar} noValidate>
@@ -307,6 +343,10 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
           totalSalgados={resumo?.total_salgados}
           limiteEntrega={resumo?.limite_entrega ?? LOJA.limiteEntrega}
           trocadoAutomaticamente={trocadoAuto}
+          totalItens={resumo?.total_itens}
+          total={freteConfirmado ? resumoFinal?.total : null}
+          calculandoTotal={freteOk && (calculandoFinal || !freteConfirmado)}
+          aoSairDoEndereco={frete?.calcularAgora}
         />
       </Secao>
 
@@ -318,6 +358,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
           limites={limites}
           exige={exigeAgendamento}
           comEntrega={comEntrega}
+          lojaFechada={lojaFechada}
         />
         {precisaConta && (
           <div className="mt-3">
@@ -367,7 +408,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
                   ? endereco.rua
                     ? `${endereco.rua}, ${endereco.numero || "s/n"} - ${endereco.vila}`
                     : "Endereço ainda não preenchido"
-                  : LOJA.enderecoRetirada}
+                  : (enderecoLoja ?? "Endereço da loja")}
               </p>
             </div>
             {entregaPermitida && (
@@ -381,24 +422,41 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
             )}
           </div>
         )}
-        <div className="space-y-1 text-sm">
+        <div className="space-y-1 text-sm" aria-live="polite">
           <div className="flex justify-between">
-            <span className="text-texto-suave">Itens</span>
-            <Valor valor={resumo?.total} calculando={calculando} />
+            <span className="text-texto-suave">Subtotal (itens)</span>
+            <Valor valor={resumo?.total_itens} calculando={calculando} />
           </div>
           {recebimento && (
-            <div className="flex justify-between">
-              <span className="text-texto-suave">{comEntrega ? "Taxa de entrega" : "Retirada"}</span>
-              <span>{comEntrega ? "A combinar" : "Grátis"}</span>
+            <div className="flex justify-between gap-3">
+              <span className="text-texto-suave">{comEntrega ? "Entrega" : "Retirada"}</span>
+              {!comEntrega ? (
+                <span>Grátis</span>
+              ) : freteConfirmado ? (
+                <Valor valor={freteDoBanco.valor} calculando={false} />
+              ) : frete?.status === "calculando" || (freteOk && calculandoFinal) ? (
+                <span className="text-texto-suave">Calculando frete...</span>
+              ) : frete?.status === "aguardando_endereco" ? (
+                <span className="text-texto-suave">Preencha o endereço</span>
+              ) : (
+                <span className="text-aviso-texto">Indisponível</span>
+              )}
             </div>
           )}
         </div>
         <div className="flex items-baseline justify-between border-t border-borda-suave pt-2">
           <span className="text-sm font-bold">Total</span>
-          <Valor valor={resumo?.total} calculando={calculando} className="text-xl font-bold text-ferrugem" />
+          {entregaSemFrete ? (
+            <span className="text-xl font-bold text-texto-suave">—</span>
+          ) : (
+            <Valor valor={resumoFinal?.total} calculando={calculandoFinal} className="text-xl font-bold text-ferrugem" />
+          )}
         </div>
-        {comEntrega && <p className="text-sm text-texto-suave">A taxa de entrega é combinada pela salgadaria.</p>}
+        {comEntrega && !freteConfirmado && frete?.status !== "aguardando_endereco" && (
+          <p className="text-sm text-texto-suave">O pedido com entrega é liberado assim que o frete estiver calculado.</p>
+        )}
         {erroCalculo && <AlertaErro>{erroCalculo}</AlertaErro>}
+        {comFrete.erro && <AlertaErro>{comFrete.erro}</AlertaErro>}
         <AlertaErro>{erroGeral}</AlertaErro>
         <button type="submit" disabled={!podeEnviar} className={CLASSE_BOTAO_PRINCIPAL}>
           {enviando

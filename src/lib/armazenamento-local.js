@@ -36,13 +36,13 @@ export function limparConvidado() {
   gravar(CHAVE_CONVIDADO, null);
 }
 
-// Endereço do último pedido: { rua, vila, numero, ponto_referencia }. Não é salvo na conta.
+// Endereço do último pedido: { cep, rua, vila, numero, ponto_referencia }. Não é salvo na conta.
 export function lerUltimoEndereco() {
   return ler(CHAVE_ENDERECO);
 }
 
-export function salvarUltimoEndereco({ rua, vila, numero, ponto_referencia }) {
-  gravar(CHAVE_ENDERECO, { rua, vila, numero, ponto_referencia });
+export function salvarUltimoEndereco({ cep, rua, vila, numero, ponto_referencia }) {
+  gravar(CHAVE_ENDERECO, { cep: cep ?? "", rua, vila, numero, ponto_referencia });
 }
 
 // ---- Lembrete de pagamento (horários em milissegundos, Date.now()) ----

@@ -24,6 +24,7 @@ export function linkWhatsappLoja(mensagem) {
  *   agendadoPara: string,                        // ISO
  *   tipoEntrega: "entrega" | "retirada",
  *   endereco?: { rua, numero, vila, ponto_referencia? } | null,
+ *   taxaEntrega?: number | null,                  // frete (só entrega)
  *   itens: { quantidade: number, nome: string, modo?: "congelado" | "pronto",
  *            sabores?: { nome: string, quantidade: number }[] }[],   // quantidade do sabor = total da linha
  *   forma?: "pix" | "dinheiro" | "cartao" | "" | null,
@@ -40,6 +41,7 @@ export function mensagemPedidoAgendado(pedido) {
     pedido.tipoEntrega === "entrega" ? `Entrega em: ${textoEndereco(pedido.endereco)}` : "Retirada no local",
     "Itens:",
     ...pedido.itens.map(linhaItem),
+    ...(pedido.tipoEntrega === "entrega" && pedido.taxaEntrega != null ? [`Entrega: R$ ${formatarValor(pedido.taxaEntrega)}`] : []),
     `Total: R$ ${formatarValor(pedido.total)}`,
     linhaPagamento(pedido),
   ];
@@ -80,4 +82,9 @@ export function mensagemPagarAgendamento({ numero, total }) {
 /** Lembrete enviado pelo servidor (WhatsApp/SMS, quando houver provedor). */
 export function mensagemLembretePagamento({ numero, total }) {
   return `Para confirmar seu agendamento do pedido nº ${numero}, realize o pagamento de R$ ${formatarValor(total)}!`;
+}
+
+/** Endereço sem frete calculado: o cliente pergunta à loja se entrega e quanto custa. */
+export function mensagemCombinarEntrega({ rua, numero, vila }) {
+  return `Olá! Quero fazer um pedido para entrega em ${rua.trim()}, ${numero.trim()} - ${vila.trim()}, Ourinhos. Vocês entregam aqui? Qual o valor do frete?`;
 }

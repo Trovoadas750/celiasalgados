@@ -60,6 +60,13 @@ export default function CardPedido({ pedido }) {
         ))}
       </ul>
 
+      {Number(pedido.taxa_entrega) > 0 && (
+        <p className="mt-2 flex justify-between gap-3 text-sm">
+          <span className="text-texto-suave">Entrega</span>
+          <span className="tabular-nums text-texto-suave">{formatarPreco(pedido.taxa_entrega)}</span>
+        </p>
+      )}
+
       <footer className="mt-3 flex items-center justify-between border-t border-borda-suave pt-3 text-sm">
         <span className="text-texto-suave">{FORMA_PAGAMENTO[pedido.forma_pagamento] ?? "Pagamento a combinar"}</span>
         <span className="font-bold text-ferrugem tabular-nums">{formatarPreco(pedido.total)}</span>

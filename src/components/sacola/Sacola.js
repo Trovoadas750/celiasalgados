@@ -139,7 +139,7 @@ export default function Sacola() {
           </span>
           {!vazia && (
             <span className="text-base font-bold tabular-nums">
-              {calculando ? "…" : resumo ? formatarPreco(resumo.total) : ""}
+              {calculando ? "…" : resumo ? formatarPreco(resumo.total_itens) : ""}
             </span>
           )}
         </button>
@@ -206,7 +206,7 @@ export default function Sacola() {
                 )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-texto-suave">Subtotal</span>
-                  <Valor valor={resumo?.total} calculando={calculando} className="font-semibold" />
+                  <Valor valor={resumo?.total_itens} calculando={calculando} className="font-semibold" />
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -222,7 +222,7 @@ export default function Sacola() {
                     className="flex h-12 flex-1 items-center justify-between rounded-xl bg-ferrugem px-4 text-sm font-bold text-white hover:bg-ferrugem-hover active:bg-ferrugem-ativo"
                   >
                     <span>Continuar pedido</span>
-                    <span className="tabular-nums">{calculando ? "…" : resumo ? formatarPreco(resumo.total) : ""}</span>
+                    <span className="tabular-nums">{calculando ? "…" : resumo ? formatarPreco(resumo.total_itens) : ""}</span>
                   </Link>
                 </div>
               </footer>

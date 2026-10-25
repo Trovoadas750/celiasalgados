@@ -11,7 +11,17 @@ Copie `.env.example` para `.env.local`.
 | `NEXT_PUBLIC_SUPABASE_URL` | navegador e servidor | URL do projeto |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | navegador | chave publishable (`sb_publishable_...`) |
 | `SUPABASE_SECRET_KEY` | **só servidor** | chave secreta (`sb_secret_...`). Nunca com `NEXT_PUBLIC_` |
+| `GEOAPIFY_API_KEY` | **só servidor** | geocodificação do frete (`/api/frete`). Nunca com `NEXT_PUBLIC_` |
 | `CRON_SECRET` | **só servidor** | protege a rota de lembretes |
+
+## Frete (entrega)
+
+- Entrega só em **Ourinhos-SP**. Frete por **distância em linha reta** até a loja, pelas faixas da tabela `faixas_frete` (hoje: até 2 km R$ 5 · até 4 km R$ 7 · até 6 km R$ 10 · acima R$ 12).
+- O navegador manda **só o endereço** para `POST /api/frete` (`src/app/api/frete/route.js`). A rota consulta o cache do banco; se o endereço for novo, chama a **Geoapify** uma vez e grava. Quem calcula distância e valor é o **banco**.
+- O checkout calcula sozinho: 1 s depois que o cliente para de digitar ou quando ele sai do campo (rua, número, vila). O CEP é opcional e usa o ViaCEP para preencher rua e bairro.
+- Endereço não encontrado, fora da área ou **loja sem coordenadas** (`config_loja.loja_lat/loja_lng`): a entrega pelo site fica bloqueada e o cliente vê "Combinar entrega pelo WhatsApp" ou "Prefiro retirar no local".
+- **Geoapify, plano grátis:** 3.000 requisições por dia (cada endereço novo gasta 1; endereço repetido sai do cache). O plano exige o crédito **"Powered by Geoapify"** com link perto do valor do frete: já está no checkout, não remova.
+- `POST /api/frete/loja` (só admin, com o token da sessão) busca as coordenadas da loja sem salvar, para a futura tela "Frete" do painel.
 
 ## Pagamento do agendamento
 

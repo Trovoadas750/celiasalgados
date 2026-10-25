@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { mensagemLembretePagamento } from "@/lib/mensagemWhatsapp";
 import { enviarLembrete } from "@/lib/notificacoes";
-import { criarSupabaseServidor, supabaseServidorConfigurado } from "@/lib/supabase-servidor";
+import { criarSupabaseServidor, supabaseServidorConfigurado } from "@/lib/supabaseServidor";
 
 // Lembretes de pagamento enviados pelo SERVIDOR (WhatsApp/SMS no futuro).
 // ESTRUTURA DESLIGADA: só funciona com CRON_SECRET e SUPABASE_SECRET_KEY definidos, e só envia de

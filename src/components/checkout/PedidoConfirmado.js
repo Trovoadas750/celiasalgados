@@ -9,7 +9,7 @@ import ModalPagamento from "@/components/pagamento/ModalPagamento";
 import StatusPagamento from "@/components/pagamento/StatusPagamento";
 import { usePedidosAoVivo } from "@/components/pagamento/usePedidosAoVivo";
 import { FORMA_PAGAMENTO, formatarDataHora, formatarPreco } from "@/lib/formatar";
-import { LOJA } from "@/lib/loja";
+import { useEnderecoLoja } from "@/lib/configLoja";
 import { linkWhatsappLoja, mensagemPedidoAgendado } from "@/lib/mensagemWhatsapp";
 
 // Permissão de notificação lida sem quebrar a hidratação ("indisponivel" no servidor).
@@ -44,12 +44,13 @@ function AtivarNotificacao() {
 }
 
 /**
- * pedido: { numero, total, pagamentoStatus, pagamentoExpiraEm, tipoEntrega, agendadoPara, forma,
+ * pedido: { numero, total, taxaEntrega, pagamentoStatus, pagamentoExpiraEm, tipoEntrega, agendadoPara, forma,
  *           endereco, comoConvidado, nome, sobrenome, telefone, itens, observacao }
  * `numero`, `total` e o pagamento vêm do criar_pedido; o resto é o que o cliente preencheu.
  */
 export default function PedidoConfirmado({ pedido }) {
   const entrega = pedido.tipoEntrega === "entrega";
+  const enderecoLoja = useEnderecoLoja();
   const agendado = Boolean(pedido.agendadoPara);
   const [pagamento, setPagamento] = useState({ status: pedido.pagamentoStatus, expiraEm: pedido.pagamentoExpiraEm });
   const [confirmadoAgora, setConfirmadoAgora] = useState(false);
@@ -106,12 +107,18 @@ export default function PedidoConfirmado({ pedido }) {
           <p className="text-sm text-texto-suave">
             {entrega
               ? `${pedido.endereco.rua}, ${pedido.endereco.numero} - ${pedido.endereco.vila}`
-              : `Busque seu pedido em: ${LOJA.enderecoRetirada}`}
+              : `Busque seu pedido em: ${enderecoLoja ?? "…"}`}
           </p>
         </div>
       </div>
 
       <dl className="mx-auto mt-3 max-w-sm divide-y divide-borda-suave rounded-2xl bg-superficie text-left text-sm ring-1 ring-borda-suave">
+        {entrega && pedido.taxaEntrega != null && (
+          <div className="flex justify-between gap-3 px-4 py-3">
+            <dt className="text-texto-suave">Entrega</dt>
+            <dd className="font-semibold tabular-nums">{formatarPreco(pedido.taxaEntrega)}</dd>
+          </div>
+        )}
         <div className="flex justify-between gap-3 px-4 py-3">
           <dt className="text-texto-suave">Total</dt>
           <dd className="font-bold text-ferrugem tabular-nums">{formatarPreco(pedido.total)}</dd>

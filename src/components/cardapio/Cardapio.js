@@ -3,6 +3,7 @@ import ModosPacote from "./ModosPacote";
 import MontadorPacote from "./MontadorPacote";
 import SecaoBebidas from "./SecaoBebidas";
 import SecaoPacotes from "./SecaoPacotes";
+import SimularFrete from "./SimularFrete";
 
 const ATALHOS = [
   { href: "#pacotes", rotulo: "Pacotes" },
@@ -54,6 +55,7 @@ export default function Cardapio({ cardapio }) {
   return (
     <>
       <AvisoEntrega />
+      <SimularFrete />
       <Atalhos />
        <ModosPacote />
       <SecaoPacotes pacotes={pacotes} />

@@ -40,6 +40,25 @@ Este documento descreve **apenas a estrutura do banco**. O banco já está criad
 - **Entrega só até 100 salgados** (1 cento). **Acima de 100**, o pedido é **só retirada no local** e **precisa ser agendado a partir do dia seguinte**.
 - **Assados prontos** precisam ser **agendados a partir do dia seguinte**.
 
+**Frete (só entrega):**
+- A loja fica na Rua Miguel de Moraes, 377 - Jardim Europa, **Ourinhos-SP**, CEP 19914-300. Entrega **só em Ourinhos**.
+- O frete é calculado pela **distância em linha reta** até a loja:
+
+  | distância | frete |
+  |---|---|
+  | até 2 km | R$ 5,00 |
+  | até 4 km | R$ 7,00 |
+  | até 6 km | R$ 10,00 |
+  | acima de 6 km | R$ 12,00 |
+
+  As faixas ficam na tabela `faixas_frete` e o admin edita pelo painel.
+- **Fluxo:**
+  1. O cliente informa rua, número e vila (CEP opcional; cidade fixa).
+  2. A **rota do servidor** `/api/frete` consulta o cache (`buscar_geocodificacao`). Se não houver resultado guardado, chama a **Geoapify** (geocodificação, plano grátis) uma vez e grava o resultado (`registrar_geocodificacao`).
+  3. O **banco** calcula a distância e o valor. O navegador nunca envia distância nem valor de frete.
+- Endereço **não encontrado** pela Geoapify, **fora da área** (mais de `raio_maximo_km`) ou loja **sem coordenadas**: a entrega pelo site fica bloqueada, e o site oferece **WhatsApp** para combinar ou **retirada**.
+- O `total` do pedido = itens + `taxa_entrega`. Retirada não tem frete.
+
 **Pagamento do agendamento:**
 - **Para agendar é obrigatório ter conta de cliente e estar logado.** O pedido fica gravado na conta (`cliente_id`). O pedido "agora" continua liberado para convidado.
 - Todo agendamento nasce com **pagamento pendente** (`pagamento_status = 'pendente'`). Ele só fica **confirmado** quando o pagamento é confirmado (`'pago'`).
@@ -175,7 +194,10 @@ Kit dentro de kit é proibido.
 | troco_para | numeric(10,2) | opcional, > 0; só com `'dinheiro'`, e ≥ total |
 | observacao | text | opcional, até 500 |
 | status | text | default `'novo'`; `'novo'` \| `'em_preparo'` \| `'saiu_para_entrega'` \| `'entregue'` \| `'cancelado'` |
-| total | numeric(10,2) | calculado pelo banco |
+| total | numeric(10,2) | calculado pelo banco = itens + `taxa_entrega` |
+| cep | text | opcional, 8 dígitos (só entrega) |
+| distancia_km | numeric(6,2) | distância em linha reta até a loja (só entrega) |
+| taxa_entrega | numeric(10,2) | frete cobrado (0 na retirada); snapshot, não muda se a tabela mudar |
 | pagamento_status | text | `'nao_exigido'` (pedido agora) \| `'pendente'` (agendado aguardando pagamento) \| `'pago'` (agendamento **confirmado**) \| `'expirado'` (não pagou no prazo; pedido cancelado) |
 | pagamento_expira_em | timestamptz | prazo para pagar (só agendados) |
 | pago_em | timestamptz | quando o pagamento foi confirmado |
@@ -231,6 +253,29 @@ Na retirada, o status `'saiu_para_entrega'` não se aplica. O painel pode exibir
 | data | date | PK |
 | motivo | text | opcional, até 120 (ex.: "Natal") |
 
+### `config_loja` — dados da loja (uma linha, `id = 1`)
+| coluna | tipo | regras |
+|---|---|---|
+| endereco | text | "Rua Miguel de Moraes, 377 - Jardim Europa" (use na retirada) |
+| cidade / uf | text | "Ourinhos" / "SP" (cidade fixa da entrega) |
+| cep | text | "19914300" |
+| loja_lat / loja_lng | numeric(9,6) | coordenadas da loja; **sem elas o frete fica `nao_configurado`** |
+| raio_maximo_km | numeric(5,2) | default 15; acima disso = fora da área (proteção contra endereço achado errado) |
+
+### `faixas_frete` — tabela de preço do frete
+| coluna | tipo | regras |
+|---|---|---|
+| id | bigint (identity) | PK |
+| ate_km | numeric(5,2) | limite da faixa (ex.: 2.00); **null = "acima da última faixa"** (só pode existir uma) |
+| valor | numeric(10,2) | ≥ 0 |
+| ativo | boolean | default true |
+
+A faixa usada é a primeira ativa (em ordem crescente de `ate_km`) com `distância ≤ ate_km`. Se nenhuma servir, usa a faixa null.
+
+### `enderecos_geocodificados` — cache da geocodificação (**só servidor**)
+- Colunas: `chave` (rua|número|vila normalizados: minúsculas, sem acento, sem pontuação), `encontrado`, `lat`, `lng`, `endereco_formatado` e `criado_em`.
+- Ninguém lê pela API pública. Só a chave secreta acessa, pelas funções `buscar_geocodificacao` e `registrar_geocodificacao`.
+
 ### `admins`
 - Colunas: `user_id` (PK, FK → auth.users) e `criado_em`.
 - Ninguém lê essa tabela pela API. Para saber se o usuário é admin, use `sou_admin()`.
@@ -253,13 +298,17 @@ Na retirada, o status `'saiu_para_entrega'` não se aplica. O painel pode exibir
 
 ## 5. Funções (RPC)
 
-### `calcular_pedido(p_itens jsonb)` → `jsonb`: anon e authenticated
+### `calcular_pedido(p_itens jsonb, p_tipo_entrega text default null, p_rua text default null, p_numero text default null, p_vila text default null)` → `jsonb`: anon e authenticated
 **Não grava nada.** Use para o carrinho e o resumo do checkout. Valida itens e sabores com as mesmas regras do `criar_pedido`, e devolve erro `P0001` se algo estiver inválido.
+- Só com `p_itens`: calcula os itens, sem frete.
+- Com `p_tipo_entrega = 'entrega'` + rua, número e vila: inclui o frete, se ele já foi calculado pelo servidor.
 
 Retorno:
 ```json
 {
-  "total": 163.00,
+  "total_itens": 163.00,
+  "frete": { "status": "ok", "distancia_km": 3.00, "valor": 7.00 },
+  "total": 170.00,
   "total_salgados": 200,
   "limite_entrega": 100,
   "entrega_permitida": false,
@@ -277,6 +326,11 @@ Retorno:
 }
 ```
 
+- `frete`: null na retirada ou sem endereço. Quando vem preenchido, `status` é:
+  - `'ok'`: tem `valor` e `distancia_km`;
+  - `'nao_calculado'`: chame `/api/frete` primeiro;
+  - `'nao_encontrado'`, `'fora_da_area'` ou `'nao_configurado'`: entrega pelo site indisponível; oferecer WhatsApp ou retirada.
+- `total` = `total_itens` + frete (só quando `status = 'ok'`).
 - `entrega_permitida`: false quando há mais de `limite_entrega` salgados. Nesse caso é **só retirada**.
 - `exige_agendamento`: true quando há assado pronto ou mais de 100 salgados.
 - `motivo_agendamento`: `'acima_do_limite'` (mais de 100 salgados), `'assados'` ou null.
@@ -307,7 +361,7 @@ Horários **livres** para agendar em uma data (formato `'YYYY-MM-DD'`):
 ### `criar_pedido(...)` → `jsonb`: anon e authenticated
 Grava o pedido inteiro e devolve:
 ```json
-{ "numero": 11, "total": 75.00, "pagamento_status": "pendente", "pagamento_expira_em": "2026-10-22T21:37:00-03:00" }
+{ "numero": 11, "total": 82.00, "taxa_entrega": 7.00, "pagamento_status": "pendente", "pagamento_expira_em": "2026-10-22T21:37:00-03:00" }
 ```
 - Pedido "agora": `pagamento_status = "nao_exigido"` e `pagamento_expira_em = null`.
 - **Agendamento exige cliente logado.**
@@ -327,6 +381,13 @@ Grava o pedido inteiro e devolve:
 | p_observacao | text | não |
 | p_agendado_para | timestamptz | null = "agora"; senão, o `inicio` de um item de `horarios_disponiveis`. **Obrigatório** fora do horário, com assado pronto ou com mais de 100 salgados |
 | p_tipo_entrega | text | não; default `'entrega'`; ou `'retirada'` |
+| p_cep | text | não (máscara aceita; guardado só na entrega) |
+
+Na **entrega**, o frete precisa ter sido calculado antes pelo `/api/frete`. Se não, o pedido dá erro:
+- `Calcule o frete do endereço antes de finalizar o pedido.`
+- `Não conseguimos calcular a entrega para esse endereço. Fale com a loja pelo WhatsApp para combinar a entrega ou escolha retirada no local.`
+
+O troco é comparado com o total **com frete**.
 
 **Formato de `p_itens`** (mesmo formato para `calcular_pedido`), de 1 a 30 linhas:
 ```json
@@ -397,6 +458,15 @@ Estrutura para lembretes enviados pelo **servidor** (WhatsApp/SMS/e-mail, quando
 ### `expirar_pagamentos_pendentes()` → `integer` (admin ou chave secreta)
 Força a expiração dos agendamentos vencidos agora e devolve quantos cancelou. Opcional: a expiração já acontece sozinha a cada novo pedido. O painel pode chamar ao abrir.
 
+### `calcular_frete(p_rua, p_numero, p_vila)` → `jsonb`: anon e authenticated
+Lê o frete de um endereço **já calculado** (nunca chama a Geoapify): `{ "status": "ok", "distancia_km": 3.00, "valor": 7.00 }`, ou um dos status acima. Não expõe coordenadas.
+
+### `buscar_geocodificacao(p_rua, p_numero, p_vila)` → `jsonb` (**só chave secreta**)
+`{ "existe": false }` ou `{ "existe": true, "encontrado": true|false }`. A rota `/api/frete` chama antes da Geoapify para não gastar requisição repetida.
+
+### `registrar_geocodificacao(p_rua, p_numero, p_vila, p_encontrado boolean, p_lat, p_lng, p_endereco_formatado)` → `jsonb` (**só chave secreta**)
+Grava o resultado da Geoapify no cache e já devolve o frete, no mesmo formato de `calcular_frete`. Se ela não achou, envie `p_encontrado = false` sem coordenadas.
+
 ### `sou_admin()` → `boolean` (authenticated)
 Diz se o usuário logado é admin.
 
@@ -417,6 +487,9 @@ Usada pelo keep-alive diário.
 | itens_pedido_conteudo | — | SELECT dos próprios | SELECT, UPDATE, DELETE |
 | horarios_funcionamento | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
 | dias_fechados | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
+| config_loja | SELECT | SELECT | SELECT, UPDATE |
+| faixas_frete | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
+| enderecos_geocodificados | — | — | — (só chave secreta) |
 | admins | — | — | — |
 
 > `acrescimo_percentual` é legível pela API (como as demais colunas de `produtos`), mas **não deve ser selecionado nem exibido** nas telas públicas. Nas consultas do site, liste as colunas explicitamente.
