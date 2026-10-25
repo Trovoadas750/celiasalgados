@@ -4,6 +4,7 @@ import Image from "next/image";
 import { IconeCaixaFesta } from "@/components/icones";
 import { formatarPreco } from "@/lib/formatar";
 import { imagemDoProduto } from "@/lib/imagens";
+import { comQualidades } from "@/lib/qualidades";
 import AdicionarBebida from "./AdicionarBebida";
 import { abrirMontador } from "./montador-store";
 
@@ -44,7 +45,7 @@ export function CardPacote({ pacote }) {
     >
       <Textos
         titulo={pacote.nome}
-        descricao={pacote.descricao || (pacote.max_sabores ? `Escolha até ${pacote.max_sabores} qualidades` : null)}
+        descricao={comQualidades(pacote.descricao) || (pacote.max_sabores ? `Escolha até ${pacote.max_sabores} qualidades` : null)}
         preco={
           <>
             A partir de <span className="font-semibold tabular-nums">{formatarPreco(pacote.preco)}</span>

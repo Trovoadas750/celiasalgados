@@ -9,6 +9,7 @@ import { adicionarPacote, atualizarPacote, LIMITE_OBSERVACAO, useSacola } from "
 import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { saboresDisponiveis } from "@/lib/cardapio";
 import { dividirSabores } from "@/lib/dividirSabores";
+import { comQualidades } from "@/lib/qualidades";
 import { formatarPreco } from "@/lib/formatar";
 import { imagemDoProduto } from "@/lib/imagens";
 import { fecharMontador, useMontador } from "./montador-store";
@@ -189,7 +190,7 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
           <span className="truncate">{pacote.nome}</span>
         </h2>
         <div className="px-4 pb-4">
-          <p className="text-texto-suave">{pacote.descricao || `Escolha até ${maximo} qualidades`}</p>
+          <p className="text-texto-suave">{comQualidades(pacote.descricao) || `Escolha até ${maximo} qualidades`}</p>
           <p className="mt-1 text-texto">
             A partir de <span className="font-semibold tabular-nums">{formatarPreco(pacote.preco)}</span>
           </p>

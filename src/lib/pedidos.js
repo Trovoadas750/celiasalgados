@@ -1,4 +1,5 @@
 import { getSupabase, supabaseConfigurado, MENSAGEM_SEM_CONFIGURACAO } from "./supabase";
+import { comQualidades } from "./qualidades";
 
 // Pedidos: simular (`calcular_pedido`) e gravar (`criar_pedido`). contextoBD.md, seção 5.
 //
@@ -31,7 +32,7 @@ export const MSG_CALCULE_O_FRETE = "Calcule o frete do endereço antes de finali
 function erroDoBanco(error) {
   // P0001: regra de negócio; a mensagem já vem em português, pronta para exibir.
   if (error.code === "P0001") {
-    const erro = new Error(error.message);
+    const erro = new Error(comQualidades(error.message));
     erro.exigeConta = error.message?.includes(MSG_AGENDAR_SEM_CONTA) ?? false;
     erro.precisaFrete = error.message?.includes(MSG_CALCULE_O_FRETE) ?? false;
     return erro;
