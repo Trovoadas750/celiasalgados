@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { IconeMais } from "@/components/icones";
 import { adicionarBebida, useSacola } from "@/components/sacola/sacola-store";
+import { lembrarPrecosAvulsos } from "@/components/sacola/useCalcularPedido";
 
 // Botão de destaque (laranja + texto café). Mostra quantas já estão na sacola.
 export default function AdicionarBebida({ bebida }) {
+  lembrarPrecosAvulsos([bebida]); // a sacola já mostra o valor da bebida na hora
   const { itens } = useSacola();
   const [cheia, setCheia] = useState(false);
   const naSacola = itens.find((i) => !i.modo && i.produtoId === bebida.id)?.quantidade ?? 0;

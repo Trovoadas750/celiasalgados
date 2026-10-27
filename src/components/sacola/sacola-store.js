@@ -8,9 +8,9 @@ import { dividirSabores } from "@/lib/dividirSabores";
 // Cada item:
 //   pacote: { chave, produtoId, nome, quantidade, modo: "congelado" | "pronto",
 //             sabores: [{ produtoId, nome, quantidade }], tamanho, observacao? }
-//   bebida: { chave, produtoId, nome, quantidade }
+//   avulso: { chave, produtoId, nome, categoria?, quantidade }  (refrigerante ou adicional, ex.: molho)
 //
-// `quantidade` = nº de pacotes (ou garrafas). A `quantidade` de cada sabor é o TOTAL da linha
+// `quantidade` = nº de pacotes (ou unidades do avulso). A `quantidade` de cada sabor é o TOTAL da linha
 // (já multiplicado pelo nº de pacotes), como o banco espera. Ex.: 2 pacotes de 30 com
 // 15 coxinhas + 15 kibes em cada = sabores [{ coxinha, 30 }, { kibe, 30 }].
 // `chave` é só um id local para editar/remover a linha; não vai para o banco.
@@ -74,11 +74,22 @@ export function itensParaPedido(lista) {
   return lista.map(paraPedido);
 }
 
-/** Adiciona um pacote montado. Retorna false se a sacola já tem o máximo de linhas. */
-export function adicionarPacote(pacote) {
-  const atual = carregar();
-  if (atual.length >= LIMITE_LINHAS) return false;
-  salvar([...atual, { ...paraGuardar(pacote), chave: novaChave() }]);
+// Soma unidades de um avulso (o mesmo produto fica numa linha só).
+function somarAvulso(lista, { id, nome, categoria }, quantidade) {
+  const existente = lista.find((i) => !i.modo && i.produtoId === id);
+  if (existente) return lista.map((i) => (i === existente ? { ...i, quantidade: i.quantidade + quantidade } : i));
+  return [...lista, { chave: novaChave(), produtoId: id, nome, categoria, quantidade }];
+}
+
+/**
+ * Adiciona um pacote montado e, junto, os adicionais escolhidos na montagem
+ * (`avulsos`: [{ produto, quantidade }]). Retorna false (sem mudar nada) se passar do máximo de linhas.
+ */
+export function adicionarPacote(pacote, avulsos = []) {
+  let nova = [...carregar(), { ...paraGuardar(pacote), chave: novaChave() }];
+  for (const { produto, quantidade } of avulsos) nova = somarAvulso(nova, produto, quantidade);
+  if (nova.length > LIMITE_LINHAS) return false;
+  salvar(nova);
   return true;
 }
 
@@ -87,16 +98,11 @@ export function atualizarPacote(chave, pacote) {
   salvar(carregar().map((i) => (i.chave === chave ? { ...paraGuardar(pacote), chave } : i)));
 }
 
-/** Soma 1 garrafa (a mesma bebida fica numa linha só). */
+/** Soma 1 garrafa (a mesma bebida fica numa linha só). Retorna false se a sacola já está cheia. */
 export function adicionarBebida(bebida) {
-  const atual = carregar();
-  const existente = atual.find((i) => !i.modo && i.produtoId === bebida.id);
-  if (existente) {
-    salvar(atual.map((i) => (i === existente ? { ...i, quantidade: i.quantidade + 1 } : i)));
-    return true;
-  }
-  if (atual.length >= LIMITE_LINHAS) return false;
-  salvar([...atual, { chave: novaChave(), produtoId: bebida.id, nome: bebida.nome, quantidade: 1 }]);
+  const nova = somarAvulso(carregar(), bebida, 1);
+  if (nova.length > LIMITE_LINHAS) return false;
+  salvar(nova);
   return true;
 }
 

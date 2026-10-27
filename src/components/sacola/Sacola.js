@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef } from "react";
 import { abrirMontador } from "@/components/cardapio/montador-store";
 import { AlertaErro } from "@/components/cliente/Campo";
-import { IconeAlerta, IconeCaixaFesta, IconeFechar, IconeGarrafa, IconeMais, IconeMenos } from "@/components/icones";
+import { IconeAlerta, IconeCaixaFesta, IconeFechar, IconeGarrafa, IconeMais, IconeMenos, IconePote } from "@/components/icones";
 import { dividirSabores } from "@/lib/dividirSabores";
 import { formatarPreco, MODO_PACOTE } from "@/lib/formatar";
 import { LOJA } from "@/lib/loja";
@@ -28,7 +28,7 @@ const LINK = "text-sm font-semibold text-link underline underline-offset-4 trans
 
 function LinhaSacola({ item, subtotal, calculando, aoEditar }) {
   const pacote = Boolean(item.modo);
-  const Icone = pacote ? IconeCaixaFesta : IconeGarrafa;
+  const Icone = pacote ? IconeCaixaFesta : item.categoria === "adicional" ? IconePote : IconeGarrafa;
   return (
     <li className="py-3">
       <div className="flex gap-3">
@@ -97,7 +97,11 @@ function LinhaSacola({ item, subtotal, calculando, aoEditar }) {
 
 export default function Sacola() {
   const { itens, quantidade } = useSacola();
-  const { resumo, erro, calculando } = useCalcularPedido(itensParaPedido(itens));
+  const { resumo, erro, calculando, previa, anterior } = useCalcularPedido(itensParaPedido(itens));
+  // Valores na hora a cada +/− (prévia com preços do banco); o banco confirma logo em seguida.
+  const valores = resumo ?? previa;
+  const esperando = calculando && !previa; // só sem prévia (item com preço ainda desconhecido)
+  const avisos = resumo ?? anterior; // avisos não piscam enquanto o banco responde
   const dialogo = useRef(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -139,7 +143,7 @@ export default function Sacola() {
           </span>
           {!vazia && (
             <span className="text-base font-bold tabular-nums">
-              {calculando ? "…" : resumo ? formatarPreco(resumo.total_itens) : ""}
+              {esperando ? "…" : valores ? formatarPreco(valores.total_itens) : ""}
             </span>
           )}
         </button>
@@ -189,8 +193,8 @@ export default function Sacola() {
                     key={item.chave}
                     item={item}
                     // calcular_pedido devolve os itens na mesma ordem em que foram enviados
-                    subtotal={resumo?.itens[i]?.subtotal}
-                    calculando={calculando}
+                    subtotal={valores?.itens[i]?.subtotal}
+                    calculando={esperando}
                     aoEditar={() => editar(item)}
                   />
                 ))}
@@ -198,15 +202,15 @@ export default function Sacola() {
 
               <footer className="space-y-3 border-t border-borda-suave bg-superficie px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
                 {erro && <AlertaErro>{erro}</AlertaErro>}
-                {resumo && !resumo.entrega_permitida && (
+                {avisos && !avisos.entrega_permitida && (
                   <p className="flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2 text-sm font-medium text-info">
                     <IconeAlerta className="mt-px size-4 shrink-0" />
-                    Pedidos acima de {resumo.limite_entrega ?? LOJA.limiteEntrega} salgados são só para retirada no local.
+                    Pedidos acima de {avisos.limite_entrega ?? LOJA.limiteEntrega} salgados são só para retirada no local.
                   </p>
                 )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-texto-suave">Subtotal</span>
-                  <Valor valor={resumo?.total_itens} calculando={calculando} className="font-semibold" />
+                  <Valor valor={valores?.total_itens} calculando={esperando} className="font-semibold" />
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -222,7 +226,7 @@ export default function Sacola() {
                     className="flex h-12 flex-1 items-center justify-between rounded-xl bg-ferrugem px-4 text-sm font-bold text-white hover:bg-ferrugem-hover active:bg-ferrugem-ativo"
                   >
                     <span>Continuar pedido</span>
-                    <span className="tabular-nums">{calculando ? "…" : resumo ? formatarPreco(resumo.total_itens) : ""}</span>
+                    <span className="tabular-nums">{esperando ? "…" : valores ? formatarPreco(valores.total_itens) : ""}</span>
                   </Link>
                 </div>
               </footer>

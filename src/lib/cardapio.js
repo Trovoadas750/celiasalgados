@@ -20,11 +20,12 @@ function clienteSupabase() {
  *  - pacotes:       categoria "kit" (30, 50 e 100 salgados)
  *  - sabores:       categoria "salgado", agrupados por tipo_salgado
  *  - refrigerantes: categoria "refrigerante"
+ *  - adicionais:    categoria "adicional" (ex.: molho de pimenta), oferecidos na montagem do pacote
  *
  * `preco` do pacote é o preço BASE (fritos). Não use como preço final: o valor real vem de
  * `calcularPedido` (lib/pedidos.js). Na tela, mostre no máximo "a partir de R$ ...".
  *
- * @returns {Promise<{ pacotes: object[], sabores: { frito: object[], assado: object[], variado: object[] }, refrigerantes: object[] }>}
+ * @returns {Promise<{ pacotes: object[], sabores: { frito: object[], assado: object[], variado: object[] }, refrigerantes: object[], adicionais: object[] }>}
  */
 export async function listarCardapio() {
   const { data, error } = await clienteSupabase()
@@ -36,12 +37,13 @@ export async function listarCardapio() {
 
   if (error) throw new Error("Não foi possível carregar o cardápio. Tente novamente.");
 
-  const cardapio = { pacotes: [], sabores: { frito: [], assado: [], variado: [] }, refrigerantes: [] };
+  const cardapio = { pacotes: [], sabores: { frito: [], assado: [], variado: [] }, refrigerantes: [], adicionais: [] };
   for (const linha of data) {
     // numeric pode chegar como string; preco_so_assado nem é selecionado (é regra interna do banco)
     const produto = { ...linha, preco: linha.preco === null ? null : Number(linha.preco) };
     if (produto.categoria === "kit") cardapio.pacotes.push(produto);
     else if (produto.categoria === "refrigerante") cardapio.refrigerantes.push(produto);
+    else if (produto.categoria === "adicional") cardapio.adicionais.push(produto);
     else if (produto.categoria === "salgado" && cardapio.sabores[produto.tipo_salgado]) {
       cardapio.sabores[produto.tipo_salgado].push(produto);
     }

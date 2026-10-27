@@ -40,7 +40,7 @@ function Atalhos() {
 
 // Cardápio montado a partir de `listarCardapio()` (lib/cardapio.js).
 export default function Cardapio({ cardapio }) {
-  const { pacotes, sabores, refrigerantes } = cardapio;
+  const { pacotes, sabores, refrigerantes, adicionais } = cardapio;
   const totalSabores = sabores.frito.length + sabores.assado.length + sabores.variado.length;
 
   if (pacotes.length === 0 && totalSabores === 0 && refrigerantes.length === 0) {
@@ -61,7 +61,7 @@ export default function Cardapio({ cardapio }) {
       <SecaoPacotes pacotes={pacotes} />
      
       <SecaoBebidas refrigerantes={refrigerantes} />
-      <MontadorPacote pacotes={pacotes} sabores={sabores} />
+      <MontadorPacote pacotes={pacotes} sabores={sabores} adicionais={adicionais} />
     </>
   );
 }

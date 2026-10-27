@@ -6,7 +6,7 @@ import { AlertaErro } from "@/components/cliente/Campo";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
 import { IconeAlerta, IconeCaixaFesta, IconeCheck, IconeFechar, IconeMais, IconeMenos } from "@/components/icones";
 import { adicionarPacote, atualizarPacote, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
-import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
+import { lembrarPrecosAvulsos, useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { saboresDisponiveis } from "@/lib/cardapio";
 import { dividirSabores } from "@/lib/dividirSabores";
 import { comQualidades } from "@/lib/qualidades";
@@ -25,6 +25,7 @@ const GRUPOS = [
   { tipo: "variado", titulo: "Variados" },
 ];
 const MAX_PACOTES = 99;
+const MAX_ADICIONAL = 99;
 
 function juntarNomes(nomes) {
   return nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes.at(-1)}`;
@@ -33,7 +34,8 @@ function juntarNomes(nomes) {
 const BADGE = "inline-flex h-7 items-center rounded-md px-2 text-sm font-bold tabular-nums";
 
 // Cabeçalho de seção (fica grudado logo abaixo do título enquanto a seção é rolada).
-function Secao({ titulo, subtitulo, contagem, maximo, completa, children }) {
+// `opcional`: troca o contador e o "OBRIGATÓRIO" por um selo "OPCIONAL".
+function Secao({ titulo, subtitulo, contagem, maximo, completa, opcional = false, children }) {
   const id = useId();
   return (
     <section aria-labelledby={id}>
@@ -45,10 +47,14 @@ function Secao({ titulo, subtitulo, contagem, maximo, completa, children }) {
           <p className="text-sm text-texto-suave">{subtitulo}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className={`${BADGE} ${completa ? "bg-sucesso-fundo text-sucesso" : "bg-vinho text-creme"}`}>
-            {contagem}/{maximo}
-          </span>
-          {completa ? (
+          {!opcional && (
+            <span className={`${BADGE} ${completa ? "bg-sucesso-fundo text-sucesso" : "bg-vinho text-creme"}`}>
+              {contagem}/{maximo}
+            </span>
+          )}
+          {opcional ? (
+            <span className={`${BADGE} bg-superficie text-texto-suave ring-1 ring-borda-input`}>OPCIONAL</span>
+          ) : completa ? (
             <span className={`${BADGE} bg-sucesso-fundo text-sucesso`}>
               <IconeCheck className="size-4" />
               <span className="sr-only">Completo</span>
@@ -89,7 +95,46 @@ function Opcao({ tipo, nome, checked, disabled, onChange, titulo, detalhe }) {
   );
 }
 
-function Formulario({ pacote, sabores, item, aoFechar }) {
+// Linha de adicional (ex.: molho): nome e preço da unidade à esquerda, quantidade (− n +) à direita.
+function LinhaAdicional({ produto, quantidade, aoMudar }) {
+  const BOTAO =
+    "grid size-9 place-items-center rounded-full text-ferrugem transition hover:bg-fundo disabled:cursor-not-allowed disabled:text-desabilitado disabled:hover:bg-transparent";
+  return (
+    <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-3">
+      <span className="min-w-0">
+        <span className="block font-medium leading-snug text-texto">{produto.nome}</span>
+        <span className="block text-sm text-texto-suave">
+          + <span className="tabular-nums">{formatarPreco(produto.preco)}</span> / unidade
+        </span>
+      </span>
+      <div className="flex shrink-0 items-center rounded-full bg-superficie ring-1 ring-borda-input">
+        <button
+          type="button"
+          onClick={() => aoMudar(Math.max(0, quantidade - 1))}
+          disabled={quantidade <= 0}
+          aria-label={`Diminuir quantidade de ${produto.nome}`}
+          className={BOTAO}
+        >
+          <IconeMenos className="size-4" />
+        </button>
+        <span className="min-w-6 text-center font-bold tabular-nums" aria-live="polite" aria-label={`${quantidade} ${produto.nome}`}>
+          {quantidade}
+        </span>
+        <button
+          type="button"
+          onClick={() => aoMudar(Math.min(MAX_ADICIONAL, quantidade + 1))}
+          disabled={quantidade >= MAX_ADICIONAL}
+          aria-label={`Aumentar quantidade de ${produto.nome}`}
+          className={BOTAO}
+        >
+          <IconeMais className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Formulario({ pacote, sabores, adicionais, item, aoFechar }) {
   const total = pacote.salgados_a_escolher;
   const maximo = pacote.max_sabores ?? total;
   const todos = [...sabores.frito, ...sabores.assado, ...sabores.variado];
@@ -100,6 +145,8 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
   const [escolhidos, setEscolhidos] = useState(() => item?.sabores.map(({ produtoId, nome }) => ({ produtoId, nome })) ?? []);
   const [pacotes, setPacotes] = useState(item?.quantidade ?? 1);
   const [observacao, setObservacao] = useState(item?.observacao ?? "");
+  // Adicionais (ex.: molho) por id do produto. Vão para a sacola como linhas próprias, junto com o pacote.
+  const [qtdAdicional, setQtdAdicional] = useState({});
   const [aviso, setAviso] = useState(null);
   const [erroSacola, setErroSacola] = useState(null);
 
@@ -113,9 +160,24 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
   const itemSacola = valido
     ? { produtoId: pacote.id, nome: pacote.nome, quantidade: pacotes, modo, sabores: divididos, tamanho: total, observacao }
     : null;
-  // Preço só do banco. A observação não muda o preço, então não entra na consulta.
+  // Na edição de um pacote da sacola, os adicionais não aparecem (eles já são linhas próprias da sacola).
+  const mostrarAdicionais = !item && adicionais.length > 0;
+  const adicionaisEscolhidos = mostrarAdicionais
+    ? adicionais.filter((p) => qtdAdicional[p.id] > 0).map((produto) => ({ produto, quantidade: qtdAdicional[produto.id] }))
+    : [];
+  // Preço só do banco (pacote + adicionais). A observação não muda o preço, então não entra na consulta.
   const itemPreco = itemSacola && { produtoId: itemSacola.produtoId, nome: itemSacola.nome, quantidade: pacotes, modo, sabores: divididos };
-  const { resumo, erro, calculando } = useCalcularPedido(itemPreco ? [itemPreco] : null);
+  const itensPreco = itemPreco && [
+    itemPreco,
+    ...adicionaisEscolhidos.map(({ produto, quantidade }) => ({ produtoId: produto.id, nome: produto.nome, quantidade })),
+  ];
+  lembrarPrecosAvulsos(adicionais);
+  const { resumo, erro, calculando, previa, anterior } = useCalcularPedido(itensPreco);
+  // Mostra o valor na hora (prévia com preços do banco); o banco confirma logo em seguida.
+  // O botão não espera o banco: só bloqueia se o banco recusou a montagem. A sacola e o
+  // checkout recalculam tudo, e o pedido só é enviado com o valor oficial.
+  const valores = resumo ?? previa;
+  const bloqueado = !valido || (Boolean(erro) && !calculando);
 
   function escolherModo(novo) {
     if (novo === modo) return;
@@ -140,9 +202,9 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
   }
 
   function confirmar() {
-    if (!itemSacola || !resumo || calculando) return;
+    if (!itemSacola || bloqueado) return;
     if (item) atualizarPacote(item.chave, itemSacola);
-    else if (!adicionarPacote(itemSacola)) {
+    else if (!adicionarPacote(itemSacola, adicionaisEscolhidos)) {
       setErroSacola("Seu pedido já tem o máximo de 30 itens. Finalize ou remova algum item.");
       return;
     }
@@ -151,14 +213,25 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
 
   let preco;
   if (!valido) preco = <span>A partir de {formatarPreco(pacote.preco)}</span>;
-  else if (calculando || !resumo) {
+  else if (valores) preco = <span className="tabular-nums">{formatarPreco(valores.total_itens)}</span>;
+  else if (calculando && anterior) {
+    // Qualidades novas ainda sem preço conhecido: mantém o último valor, com um indicador, até o banco responder.
+    // (Sem opacidade no texto: design-cores.md proíbe.)
+    preco = (
+      <span className="flex items-center gap-2">
+        <span aria-hidden="true" className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <span className="tabular-nums">{formatarPreco(anterior.total_itens)}</span>
+        <span className="sr-only">(atualizando o preço)</span>
+      </span>
+    );
+  } else if (calculando) {
     preco = (
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
         <span className="sr-only">Calculando o preço</span>
       </span>
     );
-  } else preco = <span className="tabular-nums">{formatarPreco(resumo.total)}</span>;
+  } else preco = <span>—</span>; // o banco recusou (o erro aparece acima do rodapé)
 
   return (
     <div className="relative flex h-full flex-col">
@@ -232,9 +305,17 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
             const lista = disponiveis[tipo] ?? [];
             if (lista.length === 0) return null;
             return (
-              <fieldset key={tipo}>
-                <legend className="w-full px-4 pb-1 pt-4 text-sm font-bold uppercase tracking-wide text-texto-suave">{titulo}</legend>
-                <div className="divide-y divide-borda-suave">
+              // Cada tipo num cartão próprio, com selo vinho (texto creme, design-cores.md), para separar bem os grupos.
+              // Espaço com MARGEM, não padding: a <legend> fica presa no topo do fieldset, e um padding-top
+              // ficaria entre o selo e o cartão dele (o selo pareceria ser do cartão de cima).
+              <fieldset key={tipo} className="mx-4 mt-6 last:mb-4">
+                <legend className="mb-2 flex w-full items-center gap-3">
+                  <span className="inline-flex h-8 items-center rounded-full bg-vinho px-3.5 text-sm font-bold uppercase tracking-wide text-creme">
+                    {titulo}
+                  </span>
+                  <span aria-hidden="true" className="h-0.5 flex-1 rounded-full bg-borda-suave" />
+                </legend>
+                <div className="divide-y divide-borda-suave overflow-hidden rounded-xl bg-superficie ring-1 ring-borda-suave">
                   {lista.map((sabor) => {
                     const marcado = escolhidos.some((s) => s.produtoId === sabor.id);
                     const qtd = quantidadeDe.get(sabor.id);
@@ -258,6 +339,21 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
             <Aviso>Assados prontos são por encomenda: você escolhe a data (a partir de amanhã) ao finalizar o pedido.</Aviso>
           )}
         </Secao>
+
+        {mostrarAdicionais && (
+          <Secao titulo="Adicionais" subtitulo="Quer acompanhar?" opcional>
+            <div className="divide-y divide-borda-suave">
+              {adicionais.map((produto) => (
+                <LinhaAdicional
+                  key={produto.id}
+                  produto={produto}
+                  quantidade={qtdAdicional[produto.id] ?? 0}
+                  aoMudar={(n) => setQtdAdicional({ ...qtdAdicional, [produto.id]: n })}
+                />
+              ))}
+            </div>
+          </Secao>
+        )}
 
         <div className="border-t border-borda-suave px-4 py-4">
           <div className="mb-2 flex items-baseline justify-between">
@@ -314,7 +410,7 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
         <button
           type="button"
           onClick={confirmar}
-          disabled={!valido || !resumo || calculando}
+          disabled={bloqueado}
           className={`${CLASSE_BOTAO_PRINCIPAL} justify-between`}
         >
           <span>{item ? "Salvar alterações" : "Adicionar ao pedido"}</span>
@@ -330,7 +426,7 @@ function Formulario({ pacote, sabores, item, aoFechar }) {
  * do cardápio; abre por `abrirMontador` (card do pacote ou "Editar" na sacola).
  * <dialog> com showModal: aria-modal, foco preso, Esc fecha e o foco volta para quem abriu.
  */
-export default function MontadorPacote({ pacotes, sabores }) {
+export default function MontadorPacote({ pacotes, sabores, adicionais = [] }) {
   const pedido = useMontador();
   const { itens } = useSacola();
   const dialogo = useRef(null);
@@ -354,7 +450,7 @@ export default function MontadorPacote({ pacotes, sabores }) {
       className="sheet m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-superficie p-0 text-texto sm:m-auto sm:h-[min(90dvh,860px)] sm:max-w-xl sm:rounded-2xl"
     >
       {pedido && pacote && (pedido.chave ? item : true) ? (
-        <Formulario key={pedido.id} pacote={pacote} sabores={sabores} item={item} aoFechar={fechar} />
+        <Formulario key={pedido.id} pacote={pacote} sabores={sabores} adicionais={adicionais} item={item} aoFechar={fechar} />
       ) : (
         pedido && (
           <div className="p-6">

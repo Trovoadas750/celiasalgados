@@ -92,6 +92,17 @@ export function IconeGarrafa(props) {
   );
 }
 
+// Potinho com tampa: categoria adicional (molho)
+export function IconePote(props) {
+  return (
+    <Svg {...props}>
+      <rect x="5.5" y="5" width="13" height="3.5" rx="1" />
+      <path d="M6.8 8.5l.9 10.1A1.6 1.6 0 0 0 9.3 20h5.4a1.6 1.6 0 0 0 1.6-1.4l.9-10.1" />
+      <path d="M9.5 15.5c1.8 0 3.8-1.2 4.8-3.3" />
+    </Svg>
+  );
+}
+
 export function IconeLupa(props) {
   return (
     <Svg {...props}>
@@ -158,6 +169,7 @@ export const ICONE_CATEGORIA = {
   kit: IconeCaixaFesta,
   salgado: IconeCoxinha,
   refrigerante: IconeGarrafa,
+  adicional: IconePote,
 };
 
 // Redes sociais (mesmo traço dos outros ícones)

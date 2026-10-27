@@ -69,7 +69,22 @@ Este documento descreve **apenas a estrutura do banco**. O banco já está criad
 - **Lembretes de 30 em 30 minutos:**
   - no site, `meus_pagamentos_pendentes()` já devolve a mensagem pronta;
   - no servidor (futuro WhatsApp/SMS), `pedidos_para_lembrete()` + `registrar_lembrete()`.
-- Pedidos "agora": `pagamento_status = 'nao_exigido'`, e o pagamento é feito na entrega/retirada.
+- Pedidos "agora": `pagamento_status = 'nao_exigido'`, e o pagamento é feito na entrega/retirada (Pix, dinheiro ou cartão na maquininha).
+
+**Pagamento online (InfinitePay): só para agendamentos**
+- Formas aceitas: **Pix** e **cartão de crédito** (à vista ou parcelado). A InfinitePay não tem débito online.
+- **Agendamento não aceita dinheiro nem troco:** `criar_pedido` recusa `p_forma_pagamento = 'dinheiro'` ou `p_troco_para` quando há `p_agendado_para`. A forma de pagamento é gravada só na confirmação (`pix` ou `cartao`).
+- **Fluxo:**
+  1. Cliente clica em "Pagar agora".
+  2. O servidor chama `preparar_cobranca`, cria o link na InfinitePay (`POST /links`) e guarda com `salvar_link_cobranca`.
+  3. O cliente paga na página da InfinitePay.
+  4. Webhook ou retorno ao site → o servidor **SEMPRE** confere no `payment_check` oficial → `registrar_pagamento_cobranca` → agendamento confirmado.
+- **O webhook da InfinitePay não é assinado.** O conteúdo do aviso e os parâmetros da URL de retorno **nunca** confirmam pagamento sozinhos; só o `payment_check` vale.
+- O link vale até o prazo do agendamento (`valida_ate = pagamento_expira_em`), aceita **um pagamento só** e reaproveita o mesmo link em cliques repetidos.
+- **Pagou depois do prazo** (pedido já expirado ou cancelado): a cobrança fica `paga_fora_do_prazo` e o pedido **não** volta sozinho. O dono decide pelo painel (reativar ou devolver).
+- **Valor divergente:** não confirma, grava no log e devolve `valor_divergente`.
+- O **parcelamento no cartão** pode ter juros pagos pelo cliente. Nesse caso, `valor_pago_centavos` > `valor_centavos`, e isso é normal. O que precisa bater é o `amount`.
+- Não há ambiente de teste na InfinitePay: **os testes são feitos na conta real da loja**. Tudo fica registrado em `eventos_pagamento`.
 
 **Preço do pacote** (calculado só no banco, pela função interna `private.precificar`):
 - regra de mistura: `preço base × Σ(quantidade do sabor × (1 + acréscimo/100)) ÷ total de salgados do pacote`;
@@ -276,6 +291,28 @@ A faixa usada é a primeira ativa (em ordem crescente de `ate_km`) com `distânc
 - Colunas: `chave` (rua|número|vila normalizados: minúsculas, sem acento, sem pontuação), `encontrado`, `lat`, `lng`, `endereco_formatado` e `criado_em`.
 - Ninguém lê pela API pública. Só a chave secreta acessa, pelas funções `buscar_geocodificacao` e `registrar_geocodificacao`.
 
+### `cobrancas` — tentativas de pagamento online (InfinitePay)
+| coluna | tipo | regras |
+|---|---|---|
+| id | uuid | PK; é enviado como **`order_nsu`** para a InfinitePay |
+| pedido_id | bigint | FK → pedidos.id |
+| provedor | text | `'infinitepay'` |
+| status | text | `'aberta'` \| `'paga'` \| `'paga_fora_do_prazo'` \| `'expirada'` \| `'cancelada'`; só uma `'aberta'` por pedido |
+| valor_centavos | integer | total do pedido em centavos (itens + frete) |
+| valida_ate | timestamptz | = prazo de pagamento do agendamento |
+| checkout_url | text | link de pagamento devolvido pela InfinitePay (https) |
+| criada_em / paga_em | timestamptz | |
+| transaction_nsu | text | **único**; id da transação na InfinitePay |
+| invoice_slug | text | código da fatura (`slug` na URL de retorno, `invoice_slug` no webhook) |
+| capture_method | text | `'pix'` \| `'credit_card'` |
+| parcelas | integer | 1–12 |
+| valor_pago_centavos | integer | `paid_amount` (pode incluir juros do parcelamento) |
+| receipt_url | text | link do comprovante |
+
+### `eventos_pagamento` — log de pagamento (servidor grava; admin lê)
+- Colunas: `id`, `recebido_em`, `origem` (`'webhook'`, `'retorno'`, `'criacao'`, `'verificacao'` ou `'erro'`), `cobranca_id`, `pedido_id`, `payload` (jsonb) e `resultado` (texto curto).
+- **Nunca** gravar chave de API nem dados de cartão no payload.
+
 ### `admins`
 - Colunas: `user_id` (PK, FK → auth.users) e `criado_em`.
 - Ninguém lê essa tabela pela API. Para saber se o usuário é admin, use `sou_admin()`.
@@ -427,6 +464,7 @@ O troco é comparado com o total **com frete**.
   - `Horário de agendamento inválido. Escolha um dos horários disponíveis.`
   - `Agende com pelo menos 1 hora de antecedência.`
   - `Para agendar um pedido, entre na sua conta ou crie uma.`
+  - `Agendamentos são pagos pelo site, com Pix ou cartão de crédito.`
   - `A entrega só é possível para pedidos de até 100 salgados (1 cento). Acima disso, o pedido é só para retirada no local, com agendamento a partir do dia seguinte.`
   - `Pedidos acima de 100 salgados precisam ser agendados a partir de 23/10/2026 para retirada no local.`
   - `Pedidos com assados precisam ser agendados a partir de 23/10/2026.`
@@ -467,6 +505,43 @@ Lê o frete de um endereço **já calculado** (nunca chama a Geoapify): `{ "stat
 ### `registrar_geocodificacao(p_rua, p_numero, p_vila, p_encontrado boolean, p_lat, p_lng, p_endereco_formatado)` → `jsonb` (**só chave secreta**)
 Grava o resultado da Geoapify no cache e já devolve o frete, no mesmo formato de `calcular_frete`. Se ela não achou, envie `p_encontrado = false` sem coordenadas.
 
+### Funções de pagamento online (**só chave secreta**, rotas do servidor)
+
+**`preparar_cobranca(p_pedido_id bigint, p_cliente_id uuid)`** → `jsonb`
+- Valida que o pedido é do cliente (`p_cliente_id` = id do usuário da sessão, conferido no servidor), está pendente e ainda está no prazo.
+- Reaproveita a cobrança aberta, se for do mesmo valor e já tiver link: `{ "reaproveitada": true, "checkout_url", ... }`.
+- Senão, cria uma nova cobrança:
+  ```json
+  { "reaproveitada": false, "cobranca_id": "uuid", "order_nsu": "uuid", "valor_centavos": 7500,
+    "valida_ate": "...", "descricao": "Pedido nº 16 - Edna & Célia Salgados",
+    "cliente_nome": "Ana Lima", "cliente_telefone": "+5514999990001", "pedido_id": 16 }
+  ```
+- Erros (P0001):
+  - `Pedido não encontrado.`
+  - `Este agendamento já está pago.`
+  - `O prazo para pagar este agendamento terminou. Faça um novo agendamento.`
+  - `Este pedido não tem pagamento online.`
+
+**`salvar_link_cobranca(p_cobranca_id uuid, p_checkout_url text, p_invoice_slug text default null)`**
+- Guarda o link (precisa começar com `https://`).
+
+**`registrar_pagamento_cobranca(p_order_nsu text, p_transaction_nsu text, p_valor_centavos int, p_valor_pago_centavos int, p_capture_method text, p_parcelas int, p_invoice_slug text, p_receipt_url text)`** → `jsonb`
+- Chame **somente** com os dados devolvidos pelo `payment_check` com `paid: true`. `p_valor_centavos` é o `amount`; `p_valor_pago_centavos` é o `paid_amount`.
+- Resultados:
+  - `confirmado`: pedido passou a `pago` e `forma_pagamento` virou `pix` ou `cartao`;
+  - `ja_registrado`: aviso repetido, não faz nada;
+  - `revisar`: pagou fora do prazo, cobrança `paga_fora_do_prazo`;
+  - `valor_divergente`: não confirma.
+- Erros: `order_nsu inválido.`, `Cobrança não encontrada.`, `transaction_nsu ausente.`, `Cobrança já paga com outra transação.`, `Transação já usada em outra cobrança.`
+
+**`cobranca_do_pedido(p_pedido_id bigint)`** → `jsonb`
+- A cobrança mais recente do pedido (`order_nsu`, `status`, `invoice_slug`, `transaction_nsu`, `valor_centavos`, `valida_ate`), ou `null`.
+
+**`registrar_evento_pagamento(p_origem, p_payload jsonb, p_resultado, p_cobranca_id, p_pedido_id)`**
+- Grava no log.
+
+O **cliente logado** pode ler (SELECT) as cobranças dos próprios pedidos, por exemplo o `status` e o `receipt_url`, mas não altera nada.
+
 ### `sou_admin()` → `boolean` (authenticated)
 Diz se o usuário logado é admin.
 
@@ -490,6 +565,8 @@ Usada pelo keep-alive diário.
 | config_loja | SELECT | SELECT | SELECT, UPDATE |
 | faixas_frete | SELECT | SELECT | SELECT, INSERT, UPDATE, DELETE |
 | enderecos_geocodificados | — | — | — (só chave secreta) |
+| cobrancas | — | SELECT das dos próprios pedidos | SELECT (escrita só chave secreta) |
+| eventos_pagamento | — | — | SELECT (escrita só chave secreta) |
 | admins | — | — | — |
 
 > `acrescimo_percentual` é legível pela API (como as demais colunas de `produtos`), mas **não deve ser selecionado nem exibido** nas telas públicas. Nas consultas do site, liste as colunas explicitamente.
