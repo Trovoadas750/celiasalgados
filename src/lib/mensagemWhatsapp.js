@@ -69,7 +69,8 @@ function linhaItem(item) {
 }
 
 function linhaPagamento(pedido) {
-  const forma = FORMA_PAGAMENTO[pedido.forma] ?? "a combinar";
+  // Agendamento é pago antes (online ou pelo WhatsApp); a forma só é gravada na confirmação.
+  const forma = FORMA_PAGAMENTO[pedido.forma] ?? "antecipado";
   const status = STATUS_PAGAMENTO_TEXTO[pedido.pagamentoStatus] ?? STATUS_PAGAMENTO_TEXTO.pendente;
   return `Pagamento: ${forma} · Status: ${status}`;
 }

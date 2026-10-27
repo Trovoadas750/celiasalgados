@@ -26,8 +26,23 @@ Copie `.env.example` para `.env.local`.
 ## Pagamento do agendamento
 
 - Agendar exige conta de cliente. Todo agendamento nasce **aguardando pagamento** e tem prazo (2 h ou até o horário, o que vier antes). Sem pagamento no prazo, o banco cancela e libera o horário.
-- **Ainda não há pagamento online.** O botão "Pagar agora" abre o WhatsApp da loja. O ponto de extensão é `iniciarPagamento` em `src/lib/pagamento.js`.
-- Quem confirma o pagamento hoje é o admin (`confirmar_pagamento`). O cliente vê a confirmação na hora (realtime).
+- Agendamento é pago **antes**, sem dinheiro nem troco: no checkout, a seção "Pagamento" só explica isso. A forma (`pix` ou `cartao`) é gravada quando o pagamento é confirmado.
+- O cliente vê a confirmação na hora (realtime).
+
+### Pagamento online (InfinitePay) — PRONTO, DESLIGADO até ter o handle
+
+Liga sozinho quando `INFINITEPAY_HANDLE` está definido no servidor. Sem ele, o "Pagar agora" abre o WhatsApp da loja e quem confirma é o admin (`confirmar_pagamento`).
+
+- `GET /api/pagamentos` → `{ online }`: o modal decide entre o link da InfinitePay e o WhatsApp.
+- `POST /api/pagamentos` `{ pedidoId }` (com o token da sessão do cliente): `preparar_cobranca` → cria o link (`POST /links`) → `salvar_link_cobranca`. Cliques repetidos reaproveitam o link.
+- `POST /api/pagamentos/webhook`: aviso da InfinitePay. **Não é assinado**: só diz qual cobrança conferir.
+- `GET /api/pagamentos/retorno`: a InfinitePay devolve o cliente aqui; depois ele vai para `/pedidos` com o resultado.
+- Webhook e retorno **sempre** conferem no `payment_check` oficial antes de chamar `registrar_pagamento_cobranca`. Tudo fica no log `eventos_pagamento`.
+
+**Para ligar:**
+1. Rode o SQL do pagamento online no Supabase (tabelas `cobrancas` e `eventos_pagamento`, funções e o novo `criar_pedido`).
+2. Na Vercel, cadastre `INFINITEPAY_HANDLE` (InfiniteTag sem o `$`) e `SITE_URL` (ex.: `https://celiasalgados.com.br`) e faça um novo deploy.
+3. Teste com um agendamento de valor baixo na conta real (a InfinitePay não tem ambiente de teste) e confira `eventos_pagamento`.
 
 ### Lembretes no site (já funcionam)
 

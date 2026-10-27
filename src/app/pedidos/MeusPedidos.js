@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import AvisoConta from "@/components/cliente/AvisoConta";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { AlertaErro } from "@/components/cliente/Campo";
@@ -9,6 +9,7 @@ import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
 import { IconeCheck, IconeComanda } from "@/components/icones";
 import CardPedido, { CarregandoLista } from "@/components/pedidos/CardPedido";
 import { useMeusPedidos } from "@/components/pedidos/useMeusPedidos";
+import AvisoRetornoPagamento from "@/components/pagamento/AvisoRetornoPagamento";
 import { usePedidosAoVivo } from "@/components/pagamento/usePedidosAoVivo";
 
 export default function MeusPedidos() {
@@ -66,6 +67,10 @@ export default function MeusPedidos() {
           {atualizando ? "Atualizando…" : "Atualizar"}
         </button>
       </div>
+
+      <Suspense fallback={null}>
+        <AvisoRetornoPagamento />
+      </Suspense>
 
       {confirmado && (
         <p role="status" className="mb-3 flex items-start gap-2 rounded-xl bg-sucesso-fundo px-3 py-2.5 text-sm font-semibold text-sucesso">

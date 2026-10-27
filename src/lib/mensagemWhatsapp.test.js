@@ -68,7 +68,7 @@ test("retirada, sem observação, 2 pacotes mostram sabores por pacote", () => {
   });
   assert.match(texto, /\nRetirada no local\n/);
   assert.match(texto, /- 2x 30 salgados \[pronto para comer\], cada: 30 Coxinha/);
-  assert.match(texto, /Pagamento: a combinar/);
+  assert.match(texto, /Pagamento: antecipado/);
   assert.doesNotMatch(texto, /Observação/);
 });
 

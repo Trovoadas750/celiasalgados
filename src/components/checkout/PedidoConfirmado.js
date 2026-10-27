@@ -129,7 +129,7 @@ export default function PedidoConfirmado({ pedido }) {
         </div>
         <div className="flex justify-between gap-3 px-4 py-3">
           <dt className="text-texto-suave">Pagamento</dt>
-          <dd className="font-semibold">{FORMA_PAGAMENTO[pedido.forma] ?? "A combinar"}</dd>
+          <dd className="font-semibold">{FORMA_PAGAMENTO[pedido.forma] ?? (agendado ? "Antecipado" : "A combinar")}</dd>
         </div>
       </dl>
 

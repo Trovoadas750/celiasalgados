@@ -12,7 +12,7 @@ import { useFreteEntrega } from "@/components/checkout/ResumoFrete";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
-import { IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
+import { IconeAlerta, IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { esvaziar, itensParaPedido, juntarObservacoes, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
 import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
 import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
@@ -216,7 +216,8 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       ...(comEntrega ? validar(endereco, ["cep", "rua", "vila", "numero", "ponto_referencia"]) : {}),
       ...validarAgendamento(quando, exigeAgendamento, limites),
       // Troco comparado com o total COM frete (como o banco faz).
-      ...validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0),
+      // Agendamento é pago pelo site depois de finalizar (sem dinheiro/troco): nada a escolher aqui.
+      ...(vaiAgendar ? {} : validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0)),
       ...validar({ observacao }, ["observacao"]),
       ...validarObservacaoTotal(),
     };
@@ -253,8 +254,9 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       cep: comEntrega ? endereco.cep : null,
       itens: itensParaPedido(itens),
       agendadoPara: dataAgendada,
-      formaPagamento: pagamento.forma,
-      trocoPara: pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
+      // Agendamento: a forma (Pix ou cartão) é gravada só quando o pagamento é confirmado.
+      formaPagamento: dataAgendada ? null : pagamento.forma,
+      trocoPara: !dataAgendada && pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
       observacao: observacaoFinal,
     };
     let pedido;
@@ -294,7 +296,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       ...pedido,
       tipoEntrega: recebimento,
       agendadoPara: dataAgendada,
-      forma: pagamento.forma,
+      forma: dataAgendada ? null : pagamento.forma,
       endereco: comEntrega ? endereco : null,
       comoConvidado: !logado,
       nome: quem.nome.trim(),
@@ -368,12 +370,22 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       </Secao>
 
       <Secao numero={4} titulo="Pagamento">
-        <BlocoPagamento
-          valores={pagamento}
-          setValores={semErroAoMudar(pagamento, setPagamento)}
-          erros={erros}
-          momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
-        />
+        {vaiAgendar ? (
+          <p className="flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2.5 text-sm font-medium text-info">
+            <IconeAlerta className="mt-px size-5 shrink-0" />
+            <span>
+              Agendamentos são pagos antes. Depois de finalizar, toque em <strong>Pagar agora</strong>. O horário só fica
+              garantido depois do pagamento.
+            </span>
+          </p>
+        ) : (
+          <BlocoPagamento
+            valores={pagamento}
+            setValores={semErroAoMudar(pagamento, setPagamento)}
+            erros={erros}
+            momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
+          />
+        )}
       </Secao>
 
       <Secao numero={5} titulo="Observação">

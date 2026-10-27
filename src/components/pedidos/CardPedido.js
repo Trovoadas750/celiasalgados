@@ -68,7 +68,10 @@ export default function CardPedido({ pedido }) {
       )}
 
       <footer className="mt-3 flex items-center justify-between border-t border-borda-suave pt-3 text-sm">
-        <span className="text-texto-suave">{FORMA_PAGAMENTO[pedido.forma_pagamento] ?? "Pagamento a combinar"}</span>
+        <span className="text-texto-suave">
+          {FORMA_PAGAMENTO[pedido.forma_pagamento] ??
+            (pedido.pagamento_status === "pendente" ? "Pagamento antecipado" : "Pagamento a combinar")}
+        </span>
         <span className="font-bold text-ferrugem tabular-nums">{formatarPreco(pedido.total)}</span>
       </footer>
     </article>

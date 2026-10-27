@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
+import { AlertaErro } from "@/components/cliente/Campo";
+import { CLASSE_BOTAO_PRINCIPAL, CLASSE_BOTAO_SECUNDARIO } from "@/components/cliente/estilos";
 import { IconeFechar, IconeWhatsappOficial } from "@/components/icones";
 import { formatarPreco } from "@/lib/formatar";
-import { iniciarPagamento } from "@/lib/pagamento";
+import { gerarLinkPagamento, linkPagarPeloWhatsapp, pagamentoOnlineDisponivel } from "@/lib/pagamento";
 
 /**
  * Modal "Pagamento" do botão "Pagar agora".
- * Hoje: valor, nº do pedido e o WhatsApp da loja. O caminho do pagamento vem de
- * iniciarPagamento (lib/pagamento.js), onde o provedor online vai ser plugado.
+ * - Pagamento online ligado (INFINITEPAY_HANDLE no servidor): "Pagar com Pix ou cartão" leva à página
+ *   segura da InfinitePay; ao voltar, o servidor confere e o pedido aparece pago em "Meus pedidos".
+ * - Desligado (ou se falhar ao gerar o link): pagamento pelo WhatsApp da loja, como antes.
  *
  * @param {{ pedido: { numero: number, total: number } | null, aoFechar: () => void }} props
  */
 export default function ModalPagamento({ pedido, aoFechar }) {
   const dialogo = useRef(null);
-  const [caminho, setCaminho] = useState(null); // retorno de iniciarPagamento, do pedido atual
+  const [disponivel, setDisponivel] = useState(null); // { numero, online } do pedido atual
+  const [gerando, setGerando] = useState(false);
+  const [falha, setFalha] = useState(null); // { numero, mensagem }
 
   useEffect(() => {
     const d = dialogo.current;
@@ -26,13 +30,27 @@ export default function ModalPagamento({ pedido, aoFechar }) {
   useEffect(() => {
     if (!pedido) return;
     let ativo = true;
-    iniciarPagamento(pedido).then((r) => ativo && setCaminho({ ...r, numero: pedido.numero }));
+    pagamentoOnlineDisponivel().then((online) => ativo && setDisponivel({ numero: pedido.numero, online }));
     return () => {
       ativo = false;
     };
   }, [pedido]);
 
-  const atual = caminho?.numero === pedido?.numero ? caminho : null;
+  const online = pedido && disponivel?.numero === pedido.numero ? disponivel.online : null; // null = verificando
+  const erro = pedido && falha?.numero === pedido.numero ? falha.mensagem : null;
+
+  async function pagarOnline() {
+    if (gerando) return;
+    setGerando(true);
+    setFalha(null);
+    const resposta = await gerarLinkPagamento(pedido.numero);
+    if (resposta.url) {
+      window.location.assign(resposta.url); // página da InfinitePay; o botão fica "Abrindo…" até sair
+      return;
+    }
+    setFalha({ numero: pedido.numero, mensagem: resposta.erro });
+    setGerando(false);
+  }
 
   return (
     <dialog
@@ -69,15 +87,36 @@ export default function ModalPagamento({ pedido, aoFechar }) {
             </div>
           </dl>
 
-          <p className="mt-4 text-[15px]">Em breve pagamento online. Por enquanto, pague pelo WhatsApp:</p>
+          {online === null && <div className="mt-4 h-12 animate-pulse rounded-xl bg-borda-suave" aria-busy="true" aria-label="Carregando" />}
 
-          {atual?.tipo === "whatsapp" ? (
-            <a href={atual.link} target="_blank" rel="noopener noreferrer" className={`${CLASSE_BOTAO_PRINCIPAL} mt-3`}>
-              <IconeWhatsappOficial className="size-5" />
-              Pagar pelo WhatsApp
-            </a>
-          ) : (
-            <div className="mt-3 h-12 animate-pulse rounded-xl bg-borda-suave" aria-busy="true" />
+          {online === true && (
+            <>
+              <p className="mt-4 text-[15px]">
+                Pague com <strong>Pix</strong> ou <strong>cartão de crédito</strong> na página segura da InfinitePay. Depois de
+                pagar, você volta para o site e o agendamento é confirmado.
+              </p>
+              <button type="button" onClick={pagarOnline} disabled={gerando} className={`${CLASSE_BOTAO_PRINCIPAL} mt-3`}>
+                {gerando ? "Abrindo o pagamento…" : "Pagar com Pix ou cartão"}
+              </button>
+              {erro && (
+                <div className="mt-3 space-y-3">
+                  <AlertaErro>{erro}</AlertaErro>
+                  <a href={linkPagarPeloWhatsapp(pedido)} target="_blank" rel="noopener noreferrer" className={CLASSE_BOTAO_SECUNDARIO}>
+                    Pagar pelo WhatsApp
+                  </a>
+                </div>
+              )}
+            </>
+          )}
+
+          {online === false && (
+            <>
+              <p className="mt-4 text-[15px]">Pague pelo WhatsApp da loja:</p>
+              <a href={linkPagarPeloWhatsapp(pedido)} target="_blank" rel="noopener noreferrer" className={`${CLASSE_BOTAO_PRINCIPAL} mt-3`}>
+                <IconeWhatsappOficial className="size-5" />
+                Pagar pelo WhatsApp
+              </a>
+            </>
           )}
         </div>
       )}

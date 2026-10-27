@@ -1,10 +1,13 @@
-// Estrutura de pagamento. O pagamento online AINDA NÃO EXISTE.
+// Pagamento. O front do cliente NUNCA confirma pagamento.
 //
 // Pedido "agora": pagamento_status = 'nao_exigido'; paga na entrega ou na retirada (forma_pagamento).
-// Pedido agendado: nasce 'pendente' e só vira 'pago' quando confirmado. Hoje quem confirma é o admin
-// (confirmar_pagamento). No futuro, o webhook do provedor confirma no servidor, com a chave secreta.
-// O front do cliente NUNCA confirma pagamento.
+// Pedido agendado: nasce 'pendente' e é pago antes, sem dinheiro/troco. Vira 'pago' quando:
+//  - ONLINE (InfinitePay, Pix ou cartão de crédito): o servidor confere no payment_check e registra
+//    (app/api/pagamentos). Liga sozinho quando INFINITEPAY_HANDLE está definido no servidor;
+//  - pelo WhatsApp (enquanto o online está desligado ou se falhar): o admin confirma (confirmar_pagamento).
+// O site recebe a confirmação pelo realtime.
 
+import { getSupabase } from "./supabase";
 import { linkWhatsappLoja, mensagemPagarAgendamento } from "./mensagemWhatsapp";
 
 // Valores aceitos pela coluna `pedidos.forma_pagamento`.
@@ -15,17 +18,40 @@ export const FORMAS_PAGAMENTO = [
   { id: "cartao", rotulo: "Cartão", detalhe: (momento) => `Crédito ou débito ${momento}` },
 ];
 
+/** Link do WhatsApp da loja para pagar o agendamento (caminho sem pagamento online). */
+export function linkPagarPeloWhatsapp(pedido) {
+  return linkWhatsappLoja(mensagemPagarAgendamento(pedido));
+}
+
+/** O servidor está com o pagamento online ligado? Em qualquer falha, considera desligado (usa o WhatsApp). */
+export async function pagamentoOnlineDisponivel() {
+  try {
+    const resposta = await fetch("/api/pagamentos", { cache: "no-store" });
+    if (!resposta.ok) return false;
+    return (await resposta.json())?.online === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Ponto de extensão do botão "Pagar agora" (modal de pagamento).
- *
- * @param {{ numero: number, total: number }} pedido  agendamento com pagamento pendente
- * @returns {Promise<{ tipo: "whatsapp", link: string }>}
- *
- * TODO(provedor): quando houver pagamento online, criar a cobrança por uma rota do servidor
- * (ex.: app/api/pagamentos/route.js, com a chave do provedor só no servidor) e devolver
- * { tipo: "online", qrCode, copiaECola } ou { tipo: "redirecionar", url }. O webhook do provedor
- * chama confirmar_pagamento no servidor; o site recebe a confirmação pelo realtime.
+ * Pede ao servidor o link de pagamento (InfinitePay) do agendamento. Precisa de cliente logado.
+ * @returns {Promise<{ url: string } | { erro: string }>}
  */
-export async function iniciarPagamento(pedido) {
-  return { tipo: "whatsapp", link: linkWhatsappLoja(mensagemPagarAgendamento(pedido)) };
+export async function gerarLinkPagamento(pedidoId) {
+  try {
+    const { data } = await getSupabase().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { erro: "Entre na sua conta para pagar." };
+    const resposta = await fetch("/api/pagamentos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ pedidoId }),
+    });
+    const corpo = await resposta.json().catch(() => null);
+    if (resposta.ok && typeof corpo?.url === "string") return { url: corpo.url };
+    return { erro: corpo?.erro ?? "Não foi possível gerar o link de pagamento agora. Tente de novo em instantes." };
+  } catch {
+    return { erro: "Sem conexão. Confira sua internet e tente de novo." };
+  }
 }
