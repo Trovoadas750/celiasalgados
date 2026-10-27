@@ -10,8 +10,8 @@ export const ENDERECO_VAZIO = { cep: "", rua: "", vila: "", numero: "", ponto_re
 
 /**
  * Endereço de entrega (só Ourinhos). Não é salvo na conta.
- * - CEP opcional: com 8 dígitos consulta o ViaCEP; em Ourinhos preenche rua e vila vazias e leva o
- *   foco para "Número"; outra cidade mostra o aviso; erro é ignorado.
+ * - CEP opcional: com 8 dígitos consulta o ViaCEP; em Ourinhos preenche rua e vila com o endereço
+ *   do CEP (substitui o que havia) e leva o foco para "Número"; outra cidade mostra o aviso; erro é ignorado.
  * - `aoSairDoCampo`: o checkout calcula o frete quando o cliente sai de rua, número ou vila.
  * - `semReferencia`: esconde o "Ponto de referência" (simulador de frete do cardápio).
  */
@@ -43,12 +43,8 @@ export default function FormEndereco({ valores, setValores, erros, aoSairDoCampo
       setOutraCidade(achado.cidade);
       return;
     }
-    const atual = atuais.current;
-    setValores({
-      ...atual,
-      rua: atual.rua.trim() ? atual.rua : achado.rua,
-      vila: atual.vila.trim() ? atual.vila : achado.vila,
-    });
+    // Rua e vila sempre seguem o CEP atual (trocar o CEP substitui o endereço do anterior)
+    setValores({ ...atuais.current, rua: achado.rua, vila: achado.vila });
     campoNumero.current?.focus();
   }
 
@@ -60,7 +56,7 @@ export default function FormEndereco({ valores, setValores, erros, aoSairDoCampo
           opcional
           inputMode="numeric"
           autoComplete="postal-code"
-          placeholder="Digite o CEP"
+          placeholder="Digite o CEP "
           maxLength={9}
           value={valores.cep ?? ""}
           onChange={(e) => mudarCep(e.target.value)}
