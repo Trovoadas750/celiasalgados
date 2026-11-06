@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import BlocoEntrega, { agendadoPara, hojeEmBrasilia, limitesData, validarAgendamento } from "@/components/checkout/BlocoEntrega";
 import BlocoIdentificacao from "@/components/checkout/BlocoIdentificacao";
-import BlocoPagamento, { lerValor, validarPagamento } from "@/components/checkout/BlocoPagamento";
+import BlocoPagamento, { formaAceitaNoAgendamento, lerValor, validarPagamento } from "@/components/checkout/BlocoPagamento";
 import BlocoRecebimento from "@/components/checkout/BlocoRecebimento";
 import { ENDERECO_VAZIO } from "@/components/checkout/FormEndereco";
 import PedidoConfirmado from "@/components/checkout/PedidoConfirmado";
@@ -12,15 +12,16 @@ import { useFreteEntrega } from "@/components/checkout/ResumoFrete";
 import Campo, { AlertaErro } from "@/components/cliente/Campo";
 import { useCliente } from "@/components/cliente/ClienteProvider";
 import { CLASSE_BOTAO_PRINCIPAL } from "@/components/cliente/estilos";
-import { IconeAlerta, IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
+import { IconeCracha, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { esvaziar, itensParaPedido, juntarObservacoes, LIMITE_OBSERVACAO, useSacola } from "@/components/sacola/sacola-store";
 import { useCalcularPedido } from "@/components/sacola/useCalcularPedido";
-import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
+import { lerPedidoConfirmado, lerUltimoEndereco, salvarPedidoConfirmado, salvarUltimoEndereco } from "@/lib/armazenamento-local";
 import { useEnderecoLoja } from "@/lib/configLoja";
 import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
 import { calcularFrete } from "@/lib/frete";
 import { formatarPreco, MODO_PACOTE } from "@/lib/formatar";
-import { LOJA } from "@/lib/loja";
+import { enderecoDoSite, LOJA } from "@/lib/loja";
+import { linkAcompanhamento } from "@/lib/mensagemWhatsapp";
 import { criarPedido, MSG_AGENDAR_SEM_CONTA } from "@/lib/pedidos";
 import { mascararTelefone, soDigitos, temErros, validar } from "@/lib/validacao";
 
@@ -177,6 +178,9 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   const vaiAgendar = exigeAgendamento || quando.tipo === "agendar";
   const precisaConta = vaiAgendar && !logado;
 
+  // Agendamento só aceita Pix ou cartão: ao passar para agendado, desmarca dinheiro/troco.
+  if (vaiAgendar && pagamento.forma && !formaAceitaNoAgendamento(pagamento.forma)) setPagamento({ forma: "", troco: "" });
+
   // Abre o login/cadastro na seção "Seus dados" (sem trocar de página).
   function abrirConta(aba) {
     setAbaConta(aba);
@@ -215,9 +219,8 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
     const novos = {
       ...(comEntrega ? validar(endereco, ["cep", "rua", "vila", "numero", "ponto_referencia"]) : {}),
       ...validarAgendamento(quando, exigeAgendamento, limites),
-      // Troco comparado com o total COM frete (como o banco faz).
-      // Agendamento é pago pelo site depois de finalizar (sem dinheiro/troco): nada a escolher aqui.
-      ...(vaiAgendar ? {} : validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0)),
+      // Troco comparado com o total COM frete (como o banco faz). Agendado: só Pix ou cartão.
+      ...validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0, vaiAgendar),
       ...validar({ observacao }, ["observacao"]),
       ...validarObservacaoTotal(),
     };
@@ -254,8 +257,8 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       cep: comEntrega ? endereco.cep : null,
       itens: itensParaPedido(itens),
       agendadoPara: dataAgendada,
-      // Agendamento: a forma (Pix ou cartão) é gravada só quando o pagamento é confirmado.
-      formaPagamento: dataAgendada ? null : pagamento.forma,
+      // Agendamento: Pix ou cartão (pago antes, combinado pelo WhatsApp); o banco recusa dinheiro/troco.
+      formaPagamento: pagamento.forma,
       trocoPara: !dataAgendada && pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
       observacao: observacaoFinal,
     };
@@ -290,13 +293,17 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       });
     }
     // Confirma antes de esvaziar: a tela de sucesso não pode cair no estado "sacola vazia".
-    // Os dados extras (cliente, itens, observação) montam a mensagem do WhatsApp do agendamento.
+    // Valores (número, total, frete, prazo, código) vêm do criar_pedido; o resto é o que o cliente
+    // preencheu e o resumo do calcularPedido. Tudo isso monta a mensagem do WhatsApp.
     const quem = logado ? cliente.dados : { ...convidado, telefone: soDigitos(convidado.telefone) };
     aoConfirmar({
       ...pedido,
+      subtotal: resumoFinal.total_itens ?? null,
+      linkAcompanhamento: linkAcompanhamento(pedido.codigoAcompanhamento, enderecoDoSite()),
       tipoEntrega: recebimento,
       agendadoPara: dataAgendada,
-      forma: dataAgendada ? null : pagamento.forma,
+      forma: pagamento.forma,
+      trocoPara: dadosPedido.trocoPara,
       endereco: comEntrega ? endereco : null,
       comoConvidado: !logado,
       nome: quem.nome.trim(),
@@ -370,22 +377,13 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       </Secao>
 
       <Secao numero={4} titulo="Pagamento">
-        {vaiAgendar ? (
-          <p className="flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2.5 text-sm font-medium text-info">
-            <IconeAlerta className="mt-px size-5 shrink-0" />
-            <span>
-              Agendamentos são pagos antes. Depois de finalizar, toque em <strong>Pagar agora</strong>. O horário só fica
-              garantido depois do pagamento.
-            </span>
-          </p>
-        ) : (
-          <BlocoPagamento
-            valores={pagamento}
-            setValores={semErroAoMudar(pagamento, setPagamento)}
-            erros={erros}
-            momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
-          />
-        )}
+        <BlocoPagamento
+          agendado={vaiAgendar}
+          valores={pagamento}
+          setValores={semErroAoMudar(pagamento, setPagamento)}
+          erros={erros}
+          momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
+        />
       </Secao>
 
       <Secao numero={5} titulo="Observação">
@@ -492,9 +490,30 @@ export default function Checkout() {
   const [confirmado, setConfirmado] = useState(null);
   // Mostra o esqueleto só no primeiro carregamento; um login no meio do checkout não apaga o que foi digitado.
   const [pronto, setPronto] = useState(false);
-  if (!pronto && estado !== "carregando") setPronto(true);
+  // Pedido confirmado antes de recarregar a página (sessionStorage), lido só no navegador.
+  const [restaurado, setRestaurado] = useState(null);
+  if (!pronto && estado !== "carregando") {
+    setPronto(true);
+    setRestaurado(lerPedidoConfirmado());
+  }
 
-  if (confirmado) return <PedidoConfirmado pedido={confirmado} />;
+  function confirmar(pedido) {
+    salvarPedidoConfirmado(pedido);
+    setConfirmado(pedido);
+  }
+
+  const pedidoConfirmado = confirmado ?? (itens.length === 0 ? restaurado : null);
+  if (pedidoConfirmado) return <PedidoConfirmado pedido={pedidoConfirmado} />;
+
+  // Sacola vazia antes de saber se há confirmação guardada: esqueleto, sem piscar "sacola vazia".
+  if (itens.length === 0 && !pronto) {
+    return (
+      <div className="mt-12 space-y-3" aria-busy="true" aria-label="Carregando">
+        <div className="mx-auto h-9 w-64 animate-pulse rounded-lg bg-borda-suave" />
+        <div className="h-24 animate-pulse rounded-xl bg-borda-suave" />
+      </div>
+    );
+  }
 
   if (itens.length === 0) {
     return (
@@ -520,7 +539,7 @@ export default function Checkout() {
       <ResumoSacola itens={itens} resumo={resumo} calculando={calculando} />
 
       {pronto ? (
-        <FormularioCheckout itens={itens} resumo={resumo} calculando={calculando} erroCalculo={erro} aoConfirmar={setConfirmado} />
+        <FormularioCheckout itens={itens} resumo={resumo} calculando={calculando} erroCalculo={erro} aoConfirmar={confirmar} />
       ) : (
         <div className="mt-6 space-y-3" aria-busy="true">
           <div className="h-24 animate-pulse rounded-xl bg-borda-suave" />

@@ -210,6 +210,7 @@ Kit dentro de kit é proibido.
 | observacao | text | opcional, até 500 |
 | status | text | default `'novo'`; `'novo'` \| `'em_preparo'` \| `'saiu_para_entrega'` \| `'entregue'` \| `'cancelado'` |
 | total | numeric(10,2) | calculado pelo banco = itens + `taxa_entrega` |
+| codigo_acompanhamento | uuid | **secreto e único**; dá acesso ao acompanhamento do pedido sem login (`acompanhar_pedido`) |
 | cep | text | opcional, 8 dígitos (só entrega) |
 | distancia_km | numeric(6,2) | distância em linha reta até a loja (só entrega) |
 | taxa_entrega | numeric(10,2) | frete cobrado (0 na retirada); snapshot, não muda se a tabela mudar |
@@ -290,6 +291,17 @@ A faixa usada é a primeira ativa (em ordem crescente de `ate_km`) com `distânc
 ### `enderecos_geocodificados` — cache da geocodificação (**só servidor**)
 - Colunas: `chave` (rua|número|vila normalizados: minúsculas, sem acento, sem pontuação), `encontrado`, `lat`, `lng`, `endereco_formatado` e `criado_em`.
 - Ninguém lê pela API pública. Só a chave secreta acessa, pelas funções `buscar_geocodificacao` e `registrar_geocodificacao`.
+
+### `pedido_status_historico` — linha do tempo do pedido
+| coluna | tipo | regras |
+|---|---|---|
+| id | bigint (identity) | PK |
+| pedido_id | bigint | FK → pedidos.id (cascade) |
+| status | text | status naquele momento |
+| em | timestamptz | quando mudou |
+
+- **Preenchida sozinha por gatilho:** ao criar o pedido (`novo`) e a cada mudança de `status`. O painel só faz `update pedidos set status = ...`.
+- Cliente logado lê o histórico dos próprios pedidos; admin lê todos; visitante usa `acompanhar_pedido`.
 
 ### `cobrancas` — tentativas de pagamento online (InfinitePay)
 | coluna | tipo | regras |
@@ -398,7 +410,7 @@ Horários **livres** para agendar em uma data (formato `'YYYY-MM-DD'`):
 ### `criar_pedido(...)` → `jsonb`: anon e authenticated
 Grava o pedido inteiro e devolve:
 ```json
-{ "numero": 11, "total": 82.00, "taxa_entrega": 7.00, "pagamento_status": "pendente", "pagamento_expira_em": "2026-10-22T21:37:00-03:00" }
+{ "numero": 11, "codigo_acompanhamento": "uuid", "total": 82.00, "taxa_entrega": 7.00, "pagamento_status": "pendente", "pagamento_expira_em": "2026-10-22T21:37:00-03:00" }
 ```
 - Pedido "agora": `pagamento_status = "nao_exigido"` e `pagamento_expira_em = null`.
 - **Agendamento exige cliente logado.**
@@ -542,6 +554,17 @@ Grava o resultado da Geoapify no cache e já devolve o frete, no mesmo formato d
 
 O **cliente logado** pode ler (SELECT) as cobranças dos próprios pedidos, por exemplo o `status` e o `receipt_url`, mas não altera nada.
 
+### `acompanhar_pedido(p_codigo uuid)` → `jsonb`: anon e authenticated
+Acompanhamento **sem login**, pelo código secreto do pedido (para convidados e para o link enviado no WhatsApp):
+```json
+{ "numero": 19, "status": "saiu_para_entrega", "tipo_entrega": "entrega", "agendado_para": null,
+  "pagamento_status": "nao_exigido", "total": 82.00, "criado_em": "...",
+  "historico": [ { "status": "novo", "em": "..." }, { "status": "em_preparo", "em": "..." },
+                 { "status": "saiu_para_entrega", "em": "..." } ] }
+```
+- Não devolve endereço, telefone nem nome. Código inexistente → `null`.
+- Convidado não tem tempo real: consulte de novo a cada ~30 s. Cliente logado pode usar o realtime de `pedidos`.
+
 ### `sou_admin()` → `boolean` (authenticated)
 Diz se o usuário logado é admin.
 
@@ -567,6 +590,7 @@ Usada pelo keep-alive diário.
 | enderecos_geocodificados | — | — | — (só chave secreta) |
 | cobrancas | — | SELECT das dos próprios pedidos | SELECT (escrita só chave secreta) |
 | eventos_pagamento | — | — | SELECT (escrita só chave secreta) |
+| pedido_status_historico | — (use `acompanhar_pedido`) | SELECT dos próprios pedidos | SELECT |
 | admins | — | — | — |
 
 > `acrescimo_percentual` é legível pela API (como as demais colunas de `produtos`), mas **não deve ser selecionado nem exibido** nas telas públicas. Nas consultas do site, liste as colunas explicitamente.

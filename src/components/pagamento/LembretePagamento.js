@@ -6,7 +6,7 @@ import { IconeAmpulheta, IconeFechar } from "@/components/icones";
 import { fecharLembretePor, lerLembreteFechadoAte, lerUltimaNotificacao, salvarUltimaNotificacao } from "@/lib/armazenamento-local";
 import { buscarPagamentosPendentes } from "@/lib/conta";
 import { formatarTempoRestante } from "@/lib/formatar";
-import ModalPagamento from "./ModalPagamento";
+import { linkPagamento } from "@/lib/pagamento";
 import { usePedidosAoVivo } from "./usePedidosAoVivo";
 
 const MEIA_HORA = 30 * 60 * 1000;
@@ -40,7 +40,8 @@ export async function pedirPermissaoNotificacao() {
  * Lembrete de pagamento (só cliente logado), montado no layout.
  * - Busca meus_pagamentos_pendentes() ao abrir, a cada 30 min, ao voltar para a aba e quando
  *   um pedido do cliente muda (realtime).
- * - Banner abaixo do header: mensagem do banco, tempo restante e "Pagar agora".
+ * - Banner abaixo do header: mensagem do banco, tempo restante e "Pagar agora" (abre o WhatsApp
+ *   da loja com o valor e a forma escolhida).
  * - "Fechar" esconde por 30 min; no próximo ciclo volta, enquanto estiver pendente.
  */
 export default function LembretePagamento() {
@@ -49,7 +50,6 @@ export default function LembretePagamento() {
   const [resultado, setResultado] = useState({ de: null, pendentes: [] });
   const [agora, setAgora] = useState(0); // 0 = ainda não montou no navegador
   const [fechadoAte, setFechadoAte] = useState(0);
-  const [pagando, setPagando] = useState(null);
 
   const buscar = useCallback(async () => {
     if (!usuarioId) return;
@@ -107,13 +107,21 @@ export default function LembretePagamento() {
                   <p className="font-semibold leading-snug">{p.mensagem}</p>
                   <p className="font-medium">Faltam {formatarTempoRestante(new Date(p.expira_em).getTime() - agora)} para pagar.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPagando({ numero: p.numero, total: p.total })}
+                <a
+                  href={linkPagamento({
+                    numero: p.numero,
+                    total: p.total,
+                    forma: p.forma_pagamento,
+                    agendadoPara: p.agendado_para,
+                    expiraEm: p.expira_em,
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Pagar agora o pedido nº ${p.numero} pelo WhatsApp`}
                   className="shrink-0 rounded-xl bg-ferrugem px-3 py-2 text-sm font-bold text-white transition hover:bg-ferrugem-hover active:bg-ferrugem-ativo"
                 >
                   Pagar agora
-                </button>
+                </a>
               </div>
             ))}
           </div>
@@ -127,7 +135,6 @@ export default function LembretePagamento() {
           </button>
         </div>
       )}
-      <ModalPagamento pedido={pagando} aoFechar={() => setPagando(null)} />
     </>
   );
 }

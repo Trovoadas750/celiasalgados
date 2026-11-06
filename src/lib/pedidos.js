@@ -104,7 +104,8 @@ export async function calcularPedido(itens, tipoEntrega = null, rua = null, nume
  *   observacao?: string | null,
  *   cep?: string | null,             // só na entrega; máscara aceita
  * }} pedido
- * @returns {Promise<{ numero: number, total: number, taxaEntrega: number, pagamentoStatus: string, pagamentoExpiraEm: string | null }>}
+ * @returns {Promise<{ numero: number, total: number, taxaEntrega: number, pagamentoStatus: string, pagamentoExpiraEm: string | null,
+ *   codigoAcompanhamento: string | null }>}
  * Na entrega, o frete precisa ter sido calculado antes (/api/frete); senão o banco recusa.
  * Agendado: pagamentoStatus "pendente" e prazo em pagamentoExpiraEm. "Agora": "nao_exigido" e null.
  */
@@ -149,5 +150,6 @@ export async function criarPedido({
     taxaEntrega: numero(data.taxa_entrega ?? 0),
     pagamentoStatus: data.pagamento_status ?? "nao_exigido",
     pagamentoExpiraEm: data.pagamento_expira_em ?? null,
+    codigoAcompanhamento: data.codigo_acompanhamento ?? null,
   };
 }

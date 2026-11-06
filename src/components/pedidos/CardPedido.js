@@ -1,7 +1,9 @@
-import { IconeMotoboy, IconeRetirada } from "@/components/icones";
-import StatusPagamento from "@/components/pagamento/StatusPagamento";
+import { IconeMotoboy, IconeRetirada, IconeWhatsappOficial } from "@/components/icones";
+import StatusPagamento, { statusEfetivo } from "@/components/pagamento/StatusPagamento";
 import { ehRetirada } from "@/lib/entrega";
-import { FORMA_PAGAMENTO, STATUS_PEDIDO, formatarDataHora, formatarPreco } from "@/lib/formatar";
+import { STATUS_PEDIDO, formatarDataHora, formatarPreco } from "@/lib/formatar";
+import { textoFormaPagamento } from "@/lib/mensagemWhatsapp";
+import { linkPagamento } from "@/lib/pagamento";
 
 // Um pedido no formato da consulta de `buscarMeusPedidos` (lib/conta.js).
 export default function CardPedido({ pedido }) {
@@ -42,6 +44,26 @@ export default function CardPedido({ pedido }) {
       {/* Só agendamentos: aguardando / confirmado / cancelado por falta de pagamento */}
       <StatusPagamento status={pedido.pagamento_status} expiraEm={pedido.pagamento_expira_em} className="mt-2" />
 
+      {/* Agendamento aguardando pagamento: combina pelo WhatsApp da loja (valor do banco). */}
+      {statusEfetivo(pedido.pagamento_status, pedido.pagamento_expira_em) === "pendente" && pedido.status !== "cancelado" && (
+        <a
+          href={linkPagamento({
+            numero: pedido.id,
+            total: pedido.total,
+            forma: pedido.forma_pagamento,
+            agendadoPara: pedido.agendado_para,
+            expiraEm: pedido.pagamento_expira_em,
+          })}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Pagar agora o pedido nº ${pedido.id} pelo WhatsApp`}
+          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ferrugem px-4 text-sm font-bold text-white transition hover:bg-ferrugem-hover active:bg-ferrugem-ativo"
+        >
+          <IconeWhatsappOficial className="size-5" />
+          Pagar agora
+        </a>
+      )}
+
       <ul className="mt-3 space-y-2 border-t border-dashed border-borda-suave pt-3 text-sm">
         {pedido.itens_pedido.map((item) => (
           <li key={item.id}>
@@ -69,8 +91,11 @@ export default function CardPedido({ pedido }) {
 
       <footer className="mt-3 flex items-center justify-between border-t border-borda-suave pt-3 text-sm">
         <span className="text-texto-suave">
-          {FORMA_PAGAMENTO[pedido.forma_pagamento] ??
-            (pedido.pagamento_status === "pendente" ? "Pagamento antecipado" : "Pagamento a combinar")}
+          {textoFormaPagamento({
+            forma: pedido.forma_pagamento,
+            agendadoPara: pedido.agendado_para,
+            tipoEntrega: pedido.tipo_entrega,
+          })}
         </span>
         <span className="font-bold text-ferrugem tabular-nums">{formatarPreco(pedido.total)}</span>
       </footer>

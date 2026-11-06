@@ -123,10 +123,28 @@ export async function atualizarAvatar(numero) {
 
 /**
  * Agendamentos do cliente logado aguardando pagamento, ainda no prazo.
- * @returns {Promise<{ pendentes: { numero, total, agendado_para, expira_em, mensagem }[], erro: string | null }>}
+ * Traz também a forma escolhida (Pix ou cartão) para a mensagem de pagamento do WhatsApp; o RLS
+ * deixa o cliente ler os próprios pedidos. Se essa segunda leitura falhar, `forma_pagamento` fica null.
+ * @returns {Promise<{ pendentes: { numero, total, agendado_para, expira_em, mensagem, forma_pagamento }[], erro: string | null }>}
  */
 export async function buscarPagamentosPendentes() {
-  const { data, error } = await getSupabase().rpc("meus_pagamentos_pendentes");
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc("meus_pagamentos_pendentes");
   if (error) return { pendentes: [], erro: MSG_GENERICA };
-  return { pendentes: (data ?? []).map((p) => ({ ...p, total: Number(p.total) })), erro: null };
+  const lista = data ?? [];
+  let formas = {};
+  if (lista.length > 0) {
+    const { data: pedidos } = await supabase
+      .from("pedidos")
+      .select("id, forma_pagamento")
+      .in(
+        "id",
+        lista.map((p) => p.numero),
+      );
+    formas = Object.fromEntries((pedidos ?? []).map((p) => [p.id, p.forma_pagamento]));
+  }
+  return {
+    pendentes: lista.map((p) => ({ ...p, total: Number(p.total), forma_pagamento: formas[p.numero] ?? null })),
+    erro: null,
+  };
 }

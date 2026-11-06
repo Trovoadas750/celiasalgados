@@ -83,3 +83,35 @@ export function lerLembreteFechadoAte() {
 export function fecharLembretePor(ms) {
   gravarNumero(CHAVE_LEMBRETE_FECHADO_ATE, Date.now() + ms);
 }
+
+// ---- Último pedido confirmado (sessionStorage: só esta aba) ----
+// Mantém a tela de confirmação, com o botão do WhatsApp, se o cliente recarregar a página.
+const CHAVE_PEDIDO_CONFIRMADO = "celiasalgados:pedido-confirmado";
+const VALIDADE_CONFIRMACAO = 6 * 60 * 60 * 1000;
+
+export function salvarPedidoConfirmado(pedido) {
+  try {
+    window.sessionStorage.setItem(CHAVE_PEDIDO_CONFIRMADO, JSON.stringify({ pedido, salvoEm: Date.now() }));
+  } catch {
+    // Sem armazenamento: a confirmação só não volta depois de recarregar.
+  }
+}
+
+/** Pedido confirmado nesta aba nas últimas 6 horas, ou null. */
+export function lerPedidoConfirmado() {
+  try {
+    const salvo = JSON.parse(window.sessionStorage.getItem(CHAVE_PEDIDO_CONFIRMADO));
+    const valido = salvo?.pedido?.numero && Date.now() - Number(salvo.salvoEm) < VALIDADE_CONFIRMACAO;
+    return valido ? salvo.pedido : null;
+  } catch {
+    return null;
+  }
+}
+
+export function limparPedidoConfirmado() {
+  try {
+    window.sessionStorage.removeItem(CHAVE_PEDIDO_CONFIRMADO);
+  } catch {
+    // nada a limpar
+  }
+}

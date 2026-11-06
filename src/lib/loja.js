@@ -21,6 +21,16 @@ export const LOJA = {
   limiteEntrega: 100,
 };
 
+/**
+ * Endereço público do site, sem barra no fim (links de acompanhamento nas mensagens).
+ * NEXT_PUBLIC_SITE_URL tem prioridade; vazio, usa o endereço aberto no navegador.
+ */
+export function enderecoDoSite() {
+  const configurado = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
+  if (configurado) return configurado;
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
+
 // Redes sociais na ordem em que aparecem no site. Não existe Facebook.
 export const REDES_SOCIAIS = [
   { nome: "Instagram", texto: LOJA.instagram.texto, href: LOJA.instagram.link },
