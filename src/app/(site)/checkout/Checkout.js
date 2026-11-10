@@ -322,8 +322,10 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
 
   const podeEnviar = !enviando && !calculandoFinal && Boolean(resumoFinal) && !erroCalculo && !comFrete.erro && !entregaSemFrete;
 
+  // "Seus dados" fica FORA do <form> do pedido: ela pode mostrar o login/cadastro, que têm o
+  // próprio <form> (form dentro de form é HTML inválido e o "Entrar" acabava enviando o pedido).
   return (
-    <form onSubmit={finalizar} noValidate>
+    <>
       <Secao id="secao-dados" numero={1} titulo="Seus dados">
         <BlocoIdentificacao
           exigeConta={precisaConta}
@@ -340,145 +342,147 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
         />
       </Secao>
 
-      <Secao numero={2} titulo="Entrega ou retirada?">
-        <BlocoRecebimento
-          tipo={recebimento}
-          setTipo={escolherRecebimento}
-          endereco={endereco}
-          setEndereco={semErroAoMudar(endereco, setEndereco)}
-          erros={erros}
-          frete={frete}
-          entregaPermitida={entregaPermitida}
-          totalSalgados={resumo?.total_salgados}
-          limiteEntrega={resumo?.limite_entrega ?? LOJA.limiteEntrega}
-          trocadoAutomaticamente={trocadoAuto}
-          totalItens={resumo?.total_itens}
-          total={freteConfirmado ? resumoFinal?.total : null}
-          calculandoTotal={freteOk && (calculandoFinal || !freteConfirmado)}
-          aoSairDoEndereco={frete?.calcularAgora}
-        />
-      </Secao>
+      <form onSubmit={finalizar} noValidate>
+        <Secao numero={2} titulo="Entrega ou retirada?">
+          <BlocoRecebimento
+            tipo={recebimento}
+            setTipo={escolherRecebimento}
+            endereco={endereco}
+            setEndereco={semErroAoMudar(endereco, setEndereco)}
+            erros={erros}
+            frete={frete}
+            entregaPermitida={entregaPermitida}
+            totalSalgados={resumo?.total_salgados}
+            limiteEntrega={resumo?.limite_entrega ?? LOJA.limiteEntrega}
+            trocadoAutomaticamente={trocadoAuto}
+            totalItens={resumo?.total_itens}
+            total={freteConfirmado ? resumoFinal?.total : null}
+            calculandoTotal={freteOk && (calculandoFinal || !freteConfirmado)}
+            aoSairDoEndereco={frete?.calcularAgora}
+          />
+        </Secao>
 
-      <Secao numero={3} titulo={comEntrega ? "Quando entregar" : recebimento === "retirada" ? "Quando retirar" : "Quando"}>
-        <BlocoEntrega
-          valores={quando}
-          setValores={semErroAoMudar(quando, setQuando)}
-          erros={erros}
-          limites={limites}
-          exige={exigeAgendamento}
-          comEntrega={comEntrega}
-          lojaFechada={lojaFechada}
-        />
-        {precisaConta && (
-          <div className="mt-3">
-            <AvisoContaParaAgendar erro={Boolean(erros.conta)} aoEscolher={abrirConta} />
-          </div>
-        )}
-      </Secao>
-
-      <Secao numero={4} titulo="Pagamento">
-        <BlocoPagamento
-          agendado={vaiAgendar}
-          valores={pagamento}
-          setValores={semErroAoMudar(pagamento, setPagamento)}
-          erros={erros}
-          momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
-        />
-      </Secao>
-
-      <Secao numero={5} titulo="Observação">
-        <Campo
-          rotulo="Algum recado para a cozinha?"
-          opcional
-          textarea
-          maxLength={500}
-          placeholder="Ex.: tocar o interfone 2"
-          value={observacao}
-          onChange={(e) => semErroAoMudar({ observacao }, ({ observacao: o }) => setObservacao(o))({ observacao: e.target.value })}
-          erro={erros.observacao}
-          dica={
-            observacaoFinal.length > observacao.trim().length
-              ? `${observacaoFinal.length}/${LIMITE_OBSERVACAO} (somando as observações dos pacotes)`
-              : `${observacao.length}/${LIMITE_OBSERVACAO}`
-          }
-        />
-      </Secao>
-
-      <div className="mt-6 space-y-3 rounded-2xl bg-superficie p-4 ring-1 ring-borda-suave">
-        {/* Repete a forma de recebimento logo acima do botão: última chance de perceber a escolha */}
-        {recebimento && (
-          <div className="flex items-center gap-3 rounded-xl bg-fundo p-2.5">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ferrugem text-white">
-              {comEntrega ? <IconeMotoboy className="size-6" /> : <IconeRetirada className="size-6" />}
-            </span>
-            <div className="min-w-0 flex-1 text-sm">
-              <p className="font-bold">{TIPOS_RECEBIMENTO[recebimento].titulo}</p>
-              <p className="truncate text-sm text-texto-suave">
-                {comEntrega
-                  ? endereco.rua
-                    ? `${endereco.rua}, ${endereco.numero || "s/n"} - ${endereco.vila}`
-                    : "Endereço ainda não preenchido"
-                  : (enderecoLoja ?? "Endereço da loja")}
-              </p>
+        <Secao numero={3} titulo={comEntrega ? "Quando entregar" : recebimento === "retirada" ? "Quando retirar" : "Quando"}>
+          <BlocoEntrega
+            valores={quando}
+            setValores={semErroAoMudar(quando, setQuando)}
+            erros={erros}
+            limites={limites}
+            exige={exigeAgendamento}
+            comEntrega={comEntrega}
+            lojaFechada={lojaFechada}
+          />
+          {precisaConta && (
+            <div className="mt-3">
+              <AvisoContaParaAgendar erro={Boolean(erros.conta)} aoEscolher={abrirConta} />
             </div>
-            {entregaPermitida && (
-              <button
-                type="button"
-                onClick={() => escolherRecebimento(comEntrega ? "retirada" : "entrega")}
-                className="shrink-0 text-sm font-bold text-link underline underline-offset-4 hover:text-ferrugem-ativo"
-              >
-                Trocar
-              </button>
-            )}
-          </div>
-        )}
-        <div className="space-y-1 text-sm" aria-live="polite">
-          <div className="flex justify-between">
-            <span className="text-texto-suave">Subtotal (itens)</span>
-            <Valor valor={resumo?.total_itens} calculando={calculando} />
-          </div>
+          )}
+        </Secao>
+
+        <Secao numero={4} titulo="Pagamento">
+          <BlocoPagamento
+            agendado={vaiAgendar}
+            valores={pagamento}
+            setValores={semErroAoMudar(pagamento, setPagamento)}
+            erros={erros}
+            momento={recebimento ? TIPOS_RECEBIMENTO[recebimento].momento : "na entrega ou retirada"}
+          />
+        </Secao>
+
+        <Secao numero={5} titulo="Observação">
+          <Campo
+            rotulo="Algum recado para a cozinha?"
+            opcional
+            textarea
+            maxLength={500}
+            placeholder="Ex.: tocar o interfone 2"
+            value={observacao}
+            onChange={(e) => semErroAoMudar({ observacao }, ({ observacao: o }) => setObservacao(o))({ observacao: e.target.value })}
+            erro={erros.observacao}
+            dica={
+              observacaoFinal.length > observacao.trim().length
+                ? `${observacaoFinal.length}/${LIMITE_OBSERVACAO} (somando as observações dos pacotes)`
+                : `${observacao.length}/${LIMITE_OBSERVACAO}`
+            }
+          />
+        </Secao>
+
+        <div className="mt-6 space-y-3 rounded-2xl bg-superficie p-4 ring-1 ring-borda-suave">
+          {/* Repete a forma de recebimento logo acima do botão: última chance de perceber a escolha */}
           {recebimento && (
-            <div className="flex justify-between gap-3">
-              <span className="text-texto-suave">{comEntrega ? "Entrega" : "Retirada"}</span>
-              {!comEntrega ? (
-                <span>Grátis</span>
-              ) : freteConfirmado ? (
-                <Valor valor={freteDoBanco.valor} calculando={false} />
-              ) : frete?.status === "calculando" || (freteOk && calculandoFinal) ? (
-                <span className="text-texto-suave">Calculando frete...</span>
-              ) : frete?.status === "aguardando_endereco" ? (
-                <span className="text-texto-suave">Preencha o endereço</span>
-              ) : (
-                <span className="text-aviso-texto">Indisponível</span>
+            <div className="flex items-center gap-3 rounded-xl bg-fundo p-2.5">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ferrugem text-white">
+                {comEntrega ? <IconeMotoboy className="size-6" /> : <IconeRetirada className="size-6" />}
+              </span>
+              <div className="min-w-0 flex-1 text-sm">
+                <p className="font-bold">{TIPOS_RECEBIMENTO[recebimento].titulo}</p>
+                <p className="truncate text-sm text-texto-suave">
+                  {comEntrega
+                    ? endereco.rua
+                      ? `${endereco.rua}, ${endereco.numero || "s/n"} - ${endereco.vila}`
+                      : "Endereço ainda não preenchido"
+                    : (enderecoLoja ?? "Endereço da loja")}
+                </p>
+              </div>
+              {entregaPermitida && (
+                <button
+                  type="button"
+                  onClick={() => escolherRecebimento(comEntrega ? "retirada" : "entrega")}
+                  className="shrink-0 text-sm font-bold text-link underline underline-offset-4 hover:text-ferrugem-ativo"
+                >
+                  Trocar
+                </button>
               )}
             </div>
           )}
-        </div>
-        <div className="flex items-baseline justify-between border-t border-borda-suave pt-2">
-          <span className="text-sm font-bold">Total</span>
-          {entregaSemFrete ? (
-            <span className="text-xl font-bold text-texto-suave">—</span>
-          ) : (
-            <Valor valor={resumoFinal?.total} calculando={calculandoFinal} className="text-xl font-bold text-ferrugem" />
+          <div className="space-y-1 text-sm" aria-live="polite">
+            <div className="flex justify-between">
+              <span className="text-texto-suave">Subtotal (itens)</span>
+              <Valor valor={resumo?.total_itens} calculando={calculando} />
+            </div>
+            {recebimento && (
+              <div className="flex justify-between gap-3">
+                <span className="text-texto-suave">{comEntrega ? "Entrega" : "Retirada"}</span>
+                {!comEntrega ? (
+                  <span>Grátis</span>
+                ) : freteConfirmado ? (
+                  <Valor valor={freteDoBanco.valor} calculando={false} />
+                ) : frete?.status === "calculando" || (freteOk && calculandoFinal) ? (
+                  <span className="text-texto-suave">Calculando frete...</span>
+                ) : frete?.status === "aguardando_endereco" ? (
+                  <span className="text-texto-suave">Preencha o endereço</span>
+                ) : (
+                  <span className="text-aviso-texto">Indisponível</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-baseline justify-between border-t border-borda-suave pt-2">
+            <span className="text-sm font-bold">Total</span>
+            {entregaSemFrete ? (
+              <span className="text-xl font-bold text-texto-suave">—</span>
+            ) : (
+              <Valor valor={resumoFinal?.total} calculando={calculandoFinal} className="text-xl font-bold text-ferrugem" />
+            )}
+          </div>
+          {comEntrega && !freteConfirmado && frete?.status !== "aguardando_endereco" && (
+            <p className="text-sm text-texto-suave">O pedido com entrega é liberado assim que o frete estiver calculado.</p>
           )}
+          {erroCalculo && <AlertaErro>{erroCalculo}</AlertaErro>}
+          {comFrete.erro && <AlertaErro>{comFrete.erro}</AlertaErro>}
+          <AlertaErro>{erroGeral}</AlertaErro>
+          <button type="submit" disabled={!podeEnviar} className={CLASSE_BOTAO_PRINCIPAL}>
+            {enviando
+              ? "Enviando pedido…"
+              : comEntrega
+                ? "Fazer pedido · entrega"
+                : recebimento === "retirada"
+                  ? "Fazer pedido · retirar no local"
+                  : "Fazer pedido"}
+          </button>
         </div>
-        {comEntrega && !freteConfirmado && frete?.status !== "aguardando_endereco" && (
-          <p className="text-sm text-texto-suave">O pedido com entrega é liberado assim que o frete estiver calculado.</p>
-        )}
-        {erroCalculo && <AlertaErro>{erroCalculo}</AlertaErro>}
-        {comFrete.erro && <AlertaErro>{comFrete.erro}</AlertaErro>}
-        <AlertaErro>{erroGeral}</AlertaErro>
-        <button type="submit" disabled={!podeEnviar} className={CLASSE_BOTAO_PRINCIPAL}>
-          {enviando
-            ? "Enviando pedido…"
-            : comEntrega
-              ? "Fazer pedido · entrega"
-              : recebimento === "retirada"
-                ? "Fazer pedido · retirar no local"
-                : "Fazer pedido"}
-        </button>
-      </div>
-    </form>
+      </form>
+    </>
   );
 }
 
