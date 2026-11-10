@@ -103,6 +103,7 @@ export async function calcularPedido(itens, tipoEntrega = null, rua = null, nume
  *   trocoPara?: number | null,       // só com "dinheiro"
  *   observacao?: string | null,
  *   cep?: string | null,             // só na entrega; máscara aceita
+ *   conexao?: object | null,         // cliente Supabase a usar (painel admin: sessão do admin); padrão = site
  * }} pedido
  * @returns {Promise<{ numero: number, total: number, taxaEntrega: number, pagamentoStatus: string, pagamentoExpiraEm: string | null,
  *   codigoAcompanhamento: string | null }>}
@@ -119,13 +120,14 @@ export async function criarPedido({
   trocoPara = null,
   observacao = null,
   cep = null,
+  conexao = null,
 }) {
   if (tipoEntrega !== "entrega" && tipoEntrega !== "retirada") {
     throw new Error('tipoEntrega precisa ser "entrega" ou "retirada".');
   }
   const entrega = tipoEntrega === "entrega";
 
-  const { data, error } = await supabase().rpc("criar_pedido", {
+  const { data, error } = await (conexao ?? supabase()).rpc("criar_pedido", {
     p_nome: cliente.nome.trim(),
     p_sobrenome: cliente.sobrenome.trim(),
     p_telefone: cliente.telefone, // máscara é aceita; o banco deixa só dígitos

@@ -134,7 +134,12 @@ function LinhaAdicional({ produto, quantidade, aoMudar }) {
   );
 }
 
-function Formulario({ pacote, sabores, adicionais, item, aoFechar }) {
+/**
+ * Formulário de montagem de um pacote (modo, qualidades com a divisão fixa, quantidade, adicionais).
+ * No site grava na sacola. Com `aoConfirmar(item, adicionais)` (painel admin), entrega o item a quem
+ * chamou em vez de mexer na sacola; devolver false mostra o erro de limite de itens.
+ */
+export function FormularioPacote({ pacote, sabores, adicionais, item, aoFechar, aoConfirmar }) {
   const total = pacote.salgados_a_escolher;
   const maximo = pacote.max_sabores ?? total;
   const todos = [...sabores.frito, ...sabores.assado, ...sabores.variado];
@@ -203,6 +208,14 @@ function Formulario({ pacote, sabores, adicionais, item, aoFechar }) {
 
   function confirmar() {
     if (!itemSacola || bloqueado) return;
+    if (aoConfirmar) {
+      if (aoConfirmar(itemSacola, adicionaisEscolhidos) === false) {
+        setErroSacola("O pedido já tem o máximo de 30 itens.");
+        return;
+      }
+      aoFechar();
+      return;
+    }
     if (item) atualizarPacote(item.chave, itemSacola);
     else if (!adicionarPacote(itemSacola, adicionaisEscolhidos)) {
       setErroSacola("Seu pedido já tem o máximo de 30 itens. Finalize ou remova algum item.");
@@ -450,7 +463,7 @@ export default function MontadorPacote({ pacotes, sabores, adicionais = [] }) {
       className="sheet m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-superficie p-0 text-texto sm:m-auto sm:h-[min(90dvh,860px)] sm:max-w-xl sm:rounded-2xl"
     >
       {pedido && pacote && (pedido.chave ? item : true) ? (
-        <Formulario key={pedido.id} pacote={pacote} sabores={sabores} adicionais={adicionais} item={item} aoFechar={fechar} />
+        <FormularioPacote key={pedido.id} pacote={pacote} sabores={sabores} adicionais={adicionais} item={item} aoFechar={fechar} />
       ) : (
         pedido && (
           <div className="p-6">

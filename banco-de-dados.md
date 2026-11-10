@@ -27,6 +27,16 @@ Este documento descreve **apenas a estrutura do banco**. O banco já está criad
 - O acréscimo de cada sabor fica no banco (`acrescimo_percentual`). **O site nunca mostra percentual, nem diz que assado é mais caro.** Ele mostra só o preço final, calculado pelo banco.
 - **Refrigerantes** são vendidos por unidade, à parte dos pacotes, e não têm imagem.
 
+**"Monte do seu jeito"** (`categoria = 'livre'`): quantidade e sabores à vontade
+- O cliente escolhe o modo (congelado/pronto), os sabores e **quantas unidades de cada um**.
+- **Regras** (tabela `regras_livre`): **pedido mínimo de 30 salgados e 2 qualidades**, máximo de 500 salgados; cada sabor com pelo menos 10 unidades, **de 5 em 5**; até 10 sabores (`max_sabores` do produto).
+- **Preço** (calculado só no banco):
+  - fórmula: `preco (R$ por salgado, 0,85) × Σ(qtd × (1 + acréscimo do sabor)) × (1 + 3% × (nº de sabores − 1))`;
+  - o resultado é **sempre mais caro por salgado que os kits**, e quanto mais qualidades, mais caro;
+  - os acréscimos de assado e variado valem igual.
+- Congelado/pronto, antecedência de assados e limite de 100 salgados na entrega valem igual.
+- O item vai no pedido como "Monte do seu jeito (70 salgados)", com os sabores em `itens_pedido_conteudo`.
+
 **Horário e agendamento** (tudo validado pelo banco, horário de Brasília):
 - A loja tem um **horário de atendimento** por dia da semana (`horarios_funcionamento`) e **dias fechados** (`dias_fechados`).
 - **Dentro do horário**, o cliente escolhe "**Agora**" (entrega ou retirada) ou "**Agendar**".
@@ -132,7 +142,7 @@ clientes ──< pedidos ──< itens_pedido ──< itens_pedido_conteudo
 |---|---|---|---|
 | id | bigint (identity) | todos | PK |
 | criado_em | timestamptz | todos | default now() |
-| categoria | text | todos | `'salgado'` \| `'kit'` \| `'refrigerante'` |
+| categoria | text | todos | `'salgado'` \| `'kit'` \| `'refrigerante'` \| `'adicional'` \| `'livre'` ("Monte do seu jeito") |
 | nome | text | todos | 2–80 caracteres (ex.: "Coxinha de frango", "Cento (100 salgados)", "Coca-Cola 2L") |
 | descricao | text | todos | opcional, até 300 (pacotes: "Escolha até 4 sabores") |
 | preco | numeric(10,2) | kit, refrigerante | **pacote:** preço base (fritos); **refrigerante:** preço da unidade; **salgado:** não usado (0) |
@@ -167,6 +177,18 @@ Constraints:
 - `produtos_preco_so_assado_check` (`preco_so_assado` só em kit).
 
 Nunca apagar produto que já foi pedido: desative com `ativo = false`.
+
+### `regras_livre` — regras do "Monte do seu jeito" (uma linha, `id = 1`)
+| coluna | default | significado |
+|---|---|---|
+| acrescimo_por_qualidade_pct | 3 | % a mais por sabor além do primeiro |
+| quantidade_minima / quantidade_maxima | 30 / 500 | total de salgados permitido |
+| minimo_qualidades | 2 | mínimo de qualidades (sabores diferentes) por pedido |
+| minimo_por_sabor | 10 | mínimo de unidades de cada sabor escolhido |
+| multiplo | 5 | quantidades de cada sabor de 5 em 5 |
+
+- Todos leem (o site mostra os limites); só o admin altera.
+- O preço por salgado fica em `produtos.preco` do produto `categoria = 'livre'`, e o máximo de sabores em `produtos.max_sabores`.
 
 ### `kit_componentes` — partes fixas de um kit
 Existe para kits com itens fixos, mas **os pacotes atuais não usam**. Colunas:
@@ -210,6 +232,7 @@ Kit dentro de kit é proibido.
 | observacao | text | opcional, até 500 |
 | status | text | default `'novo'`; `'novo'` \| `'em_preparo'` \| `'saiu_para_entrega'` \| `'entregue'` \| `'cancelado'` |
 | total | numeric(10,2) | calculado pelo banco = itens + `taxa_entrega` |
+| origem | text | `'site'` (default) \| `'admin'` (lançado pelo painel: telefone, WhatsApp, balcão) |
 | codigo_acompanhamento | uuid | **secreto e único**; dá acesso ao acompanhamento do pedido sem login (`acompanhar_pedido`) |
 | cep | text | opcional, 8 dígitos (só entrega) |
 | distancia_km | numeric(6,2) | distância em linha reta até a loja (só entrega) |
@@ -233,7 +256,7 @@ Na retirada, o status `'saiu_para_entrega'` não se aplica. O painel pode exibir
 | id | bigint (identity) | PK |
 | pedido_id | bigint | FK → pedidos.id (on delete cascade) |
 | produto_id | bigint | FK → produtos.id (on delete set null) |
-| categoria | text | snapshot: `'kit'` (pacote) \| `'refrigerante'` (`'salgado'` só em pedidos antigos) |
+| categoria | text | snapshot: `'kit'` (pacote) \| `'livre'` ("Monte do seu jeito") \| `'refrigerante'` \| `'adicional'` (`'salgado'` só em pedidos antigos) |
 | nome_produto | text | snapshot do nome |
 | modo | text | `'congelado'` \| `'pronto'` para pacotes; null para refrigerante |
 | quantidade | integer | 1–1000 (nº de pacotes ou de garrafas) |
@@ -276,6 +299,7 @@ Na retirada, o status `'saiu_para_entrega'` não se aplica. O painel pode exibir
 | cidade / uf | text | "Ourinhos" / "SP" (cidade fixa da entrega) |
 | cep | text | "19914300" |
 | loja_lat / loja_lng | numeric(9,6) | coordenadas da loja; **sem elas o frete fica `nao_configurado`** |
+| pausado_ate | timestamptz | pausa temporária ("cozinha lotada"): até essa hora o site não aceita pedido "agora"; null = sem pausa |
 | raio_maximo_km | numeric(5,2) | default 15; acima disso = fora da área (proteção contra endereço achado errado) |
 
 ### `faixas_frete` — tabela de preço do frete
@@ -324,6 +348,18 @@ A faixa usada é a primeira ativa (em ordem crescente de `ate_km`) com `distânc
 ### `eventos_pagamento` — log de pagamento (servidor grava; admin lê)
 - Colunas: `id`, `recebido_em`, `origem` (`'webhook'`, `'retorno'`, `'criacao'`, `'verificacao'` ou `'erro'`), `cobranca_id`, `pedido_id`, `payload` (jsonb) e `resultado` (texto curto).
 - **Nunca** gravar chave de API nem dados de cartão no payload.
+
+### `telefones_bloqueados` — trote/calote (**só admin**)
+| coluna | tipo | regras |
+|---|---|---|
+| telefone | text | PK, só dígitos (10–11) |
+| motivo | text | até 200 |
+| criado_em | timestamptz | |
+
+O `criar_pedido` recusa pedidos do site com esses telefones (`Não foi possível concluir o pedido por este telefone. Fale com a loja pelo WhatsApp.`). O admin ainda consegue lançar.
+
+### `anotacoes_pedido` — notas internas (**só admin**; o cliente nunca vê)
+- Colunas: `id`, `pedido_id` (FK, cascade), `texto` (1–1000), `autor_id` (default `auth.uid()`) e `criado_em`.
 
 ### `admins`
 - Colunas: `user_id` (PK, FK → auth.users) e `criado_em`.
@@ -390,9 +426,10 @@ Retorno:
 
 ### `status_loja()` → `jsonb`: anon e authenticated
 ```json
-{ "aberta": false, "fecha_as": null, "proxima_abertura": "2026-10-23T08:00:00-03:00" }
+{ "aberta": false, "fecha_as": null, "proxima_abertura": "2026-10-23T08:00:00-03:00", "pausado_ate": null }
 ```
 - `fecha_as` ("HH:MM") vem preenchido só quando a loja está aberta.
+- `pausado_ate`: preenchido quando o admin pausou a loja. Nesse período, `aberta` = false e só é possível agendar.
 - `proxima_abertura`: próxima vez que a loja abre nos próximos 14 dias (null se não houver).
 
 ### `horarios_disponiveis(p_data date, p_itens jsonb default null)` → `jsonb`: anon e authenticated
@@ -452,7 +489,13 @@ O troco é comparado com o total **com frete**.
   - soma das quantidades = `salgados_a_escolher × quantidade`;
   - nº de sabores ≤ `max_sabores`;
   - cada sabor precisa ser salgado ativo e disponível no modo (`vende_congelado` / `vende_pronto`).
-- **Refrigerante:** só `produto_id` e `quantidade`.
+- **"Monte do seu jeito"** (`categoria = 'livre'`): `quantidade` **sempre 1**, `modo` obrigatório e `sabores` com as quantidades que o cliente escolheu, seguindo as regras de `regras_livre`. Erros possíveis (P0001), já em português:
+  - `Em "Monte do seu jeito", escolha pelo menos 30 salgados (escolhidos: 25).`
+  - `Em "Monte do seu jeito", escolha pelo menos 2 qualidades de salgado.`
+  - `Em "Monte do seu jeito", cada sabor precisa ter pelo menos 10 unidades.`
+  - `Em "Monte do seu jeito", as quantidades de cada sabor devem ser de 5 em 5.`
+  - `Em "Monte do seu jeito", o máximo é 500 salgados por pedido.`
+- **Refrigerante / adicional:** só `produto_id` e `quantidade`.
 - Enviar um **salgado** diretamente gera erro: salgado só entra como sabor de pacote.
 
 **Regras aplicadas:**
@@ -565,6 +608,31 @@ Acompanhamento **sem login**, pelo código secreto do pedido (para convidados e 
 - Não devolve endereço, telefone nem nome. Código inexistente → `null`.
 - Convidado não tem tempo real: consulte de novo a cada ~30 s. Cliente logado pode usar o realtime de `pedidos`.
 
+### Pedido lançado pelo ADMIN (mesmo `criar_pedido`)
+Quando quem chama é admin (`private.is_admin()`), o `criar_pedido`:
+- **permite agendar sem conta de cliente** (`cliente_id` null) e com **qualquer horário válido** que ainda esteja livre (sem a antecedência mínima de 1 hora);
+- **ignora:** loja fechada ou pausada, limite de 100 salgados na entrega, antecedência de assados e de mais de 100 salgados, trava anti-spam por telefone, proibição de dinheiro/troco no agendamento e telefone bloqueado;
+- **mantém:** preço do banco, frete (o endereço precisa ser calculado antes pelo `/api/frete`), validade do horário (30 em 30 min, dentro do expediente) e **um pedido por horário**;
+- grava `origem = 'admin'` e `pagamento_status = 'nao_exigido'` (**não expira**). O pagamento é combinado direto com a loja.
+
+### Relatórios (**só admin**; outro usuário recebe `Sem permissão.`)
+"Dia do pedido" = dia do `agendado_para` ou, se não agendado, dia do `criado_em` (horário de Brasília). Não entram os cancelados nem os agendamentos com pagamento pendente (esses aparecem separados).
+
+**`admin_resumo(p_inicio date, p_fim date)`** → `jsonb` (período de até 1 ano)
+- `pedidos`, `faturamento`, `frete`, `ticket_medio`, `cancelados`;
+- `aguardando_pagamento { pedidos, valor }`;
+- `por_dia [{dia, pedidos, faturamento}]`, `por_tipo_entrega { entrega|retirada: {pedidos, valor} }`, `por_pagamento [{forma, pedidos, valor}]`, `por_origem { site, admin }`, `por_hora [{hora, pedidos}]`;
+- `top_produtos [{nome, quantidade, valor}]` (15), `top_sabores [{nome, quantidade}]` (20), `clientes_novos`.
+
+**`admin_producao(p_data date, p_incluir_pendentes boolean default false)`** → `jsonb`
+- `pedidos`, `pedidos_pendentes_fora` (agendamentos com pagamento pendente que ficaram de fora);
+- `sabores [{nome, congelado, pronto, total}]`: **quanto fazer de cada sabor**;
+- `pacotes [{nome, modo, quantidade}]`, `avulsos [{nome, categoria, quantidade}]` (refrigerantes e adicionais), `por_horario [{hora, pedidos}]`.
+
+**`admin_clientes(p_busca text default null, p_limite int default 200)`** → `jsonb`
+- Clientes **com conta e convidados**, agrupados pelo telefone (inclui bloqueados sem pedido): `[{ telefone, cliente_id, conta_criada_em, nome, pedidos, cancelados, total_gasto, ultimo_pedido, bloqueado, motivo_bloqueio }]`.
+- Busca por nome ou por parte do telefone.
+
 ### `sou_admin()` → `boolean` (authenticated)
 Diz se o usuário logado é admin.
 
@@ -591,6 +659,8 @@ Usada pelo keep-alive diário.
 | cobrancas | — | SELECT das dos próprios pedidos | SELECT (escrita só chave secreta) |
 | eventos_pagamento | — | — | SELECT (escrita só chave secreta) |
 | pedido_status_historico | — (use `acompanhar_pedido`) | SELECT dos próprios pedidos | SELECT |
+| telefones_bloqueados | — | — | tudo |
+| anotacoes_pedido | — | — | tudo |
 | admins | — | — | — |
 
 > `acrescimo_percentual` é legível pela API (como as demais colunas de `produtos`), mas **não deve ser selecionado nem exibido** nas telas públicas. Nas consultas do site, liste as colunas explicitamente.
