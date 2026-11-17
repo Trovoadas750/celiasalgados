@@ -1,8 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import { IconeCaixaFesta } from "@/components/icones";
 import { formatarPreco } from "@/lib/formatar";
+import { dividirLivre } from "@/lib/livre";
+import { calcularPedido } from "@/lib/pedidos";
 import { imagemDoProduto } from "@/lib/imagens";
 import { comQualidades } from "@/lib/qualidades";
 import AdicionarBebida from "./AdicionarBebida";
@@ -24,10 +27,11 @@ function ImagemCard({ produto }) {
   );
 }
 
-function Textos({ titulo, descricao, preco }) {
+function Textos({ titulo, subtitulo, descricao, preco }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col self-stretch">
       <h3 className="line-clamp-3 text-[17px] font-bold leading-snug text-texto">{titulo}</h3>
+      {subtitulo && <p className="mt-0.5 text-[15px] font-semibold leading-snug text-cobre-esc">{subtitulo}</p>}
       {descricao && <p className="mt-1 line-clamp-2 text-[15px] leading-snug text-texto-suave">{descricao}</p>}
       <p className="mt-auto pt-3 text-[15px] text-texto">{preco}</p>
     </div>
@@ -53,6 +57,62 @@ export function CardPacote({ pacote }) {
         }
       />
       <ImagemCard produto={pacote} />
+    </button>
+  );
+}
+
+/**
+ * "A partir de" do "Monte do seu jeito": preço do banco para o PEDIDO MÍNIMO (quantidade mínima
+ * dividida entre o mínimo de qualidades fritas, congelado). Calcula uma vez; se falhar, não mostra.
+ */
+function usePrecoMinimoLivre(livre, fritos) {
+  const [preco, setPreco] = useState(null);
+  useEffect(() => {
+    const { regras } = livre;
+    const escolhidos = fritos.filter((s) => s.vende_congelado).slice(0, regras.minimo_qualidades);
+    const partes = dividirLivre(regras.quantidade_minima, regras.minimo_qualidades, regras);
+    if (!partes || escolhidos.length < regras.minimo_qualidades) return;
+    let ativo = true;
+    calcularPedido([
+      {
+        produtoId: livre.id,
+        quantidade: 1,
+        modo: "congelado",
+        sabores: escolhidos.map((s, i) => ({ produtoId: s.id, quantidade: partes[i] })),
+      },
+    ])
+      .then((resumo) => ativo && setPreco(resumo.total_itens))
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, [livre, fritos]);
+  return preco;
+}
+
+/** Card "Monte do seu jeito": abre a montagem livre (quantidade e qualidades à vontade). */
+export function CardLivre({ livre, fritos }) {
+  const precoMinimo = usePrecoMinimoLivre(livre, fritos);
+  return (
+    <button
+      type="button"
+      onClick={() => abrirMontador({ pacoteId: livre.id })}
+      aria-label={`Montar ${livre.nome}${precoMinimo != null ? `, a partir de ${formatarPreco(precoMinimo)}` : ""}`}
+      className="flex w-full items-start gap-4 bg-superficie p-5 text-left transition hover:bg-fundo hover:shadow-[inset_3px_0_0_var(--vinho)]"
+    >
+      <Textos
+        titulo={livre.nome}
+        subtitulo="Escolha a quantidade e as qualidades que quiser"
+        descricao={comQualidades(livre.descricao)}
+        preco={
+          precoMinimo != null ? (
+            <>
+              A partir de <span className="font-semibold tabular-nums">{formatarPreco(precoMinimo)}</span>
+            </>
+          ) : null
+        }
+      />
+      <ImagemCard produto={livre} />
     </button>
   );
 }

@@ -7,10 +7,12 @@ import { listarProdutosAdmin, previaPrecoSabor } from "@/lib/admin/loja";
 import { formatarPreco, formatarValor } from "@/lib/formatar";
 import { imagemDoProduto } from "@/lib/imagens";
 import { CLASSE_BOTAO_CONTORNO, CLASSE_CHIP } from "../estilos";
+import AbaLivre from "./AbaLivre";
 import { AvisoSoConsulta, Carregando, SeloAtivo, SimNao } from "./Comum";
 
 const ABAS = [
   ["pacotes", "Pacotes"],
+  ["livre", "Monte do seu jeito"],
   ["sabores", "Sabores"],
   ["bebidas", "Bebidas"],
   ["adicionais", "Adicionais"],
@@ -107,6 +109,8 @@ export default function TelaCardapio() {
           <AlertaErro>{dados.erro}</AlertaErro>
         ) : !dados.carregado ? (
           <Carregando />
+        ) : aba === "livre" ? (
+          <AbaLivre grupos={g} />
         ) : lista.length === 0 ? (
           <p className="rounded-2xl bg-superficie px-4 py-8 text-center font-semibold ring-1 ring-borda-suave">Nada nesta categoria.</p>
         ) : (

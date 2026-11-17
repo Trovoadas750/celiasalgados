@@ -13,87 +13,11 @@ import { comQualidades } from "@/lib/qualidades";
 import { formatarPreco } from "@/lib/formatar";
 import { imagemDoProduto } from "@/lib/imagens";
 import { fecharMontador, useMontador } from "./montador-store";
+import { FormularioLivre } from "./MontadorLivre";
+import { Aviso, GRUPOS, juntarNomes, MODOS, NOME_MODO, Opcao, Secao } from "./montador-pecas";
 
-const MODOS = [
-  { id: "congelado", titulo: "Congelado", detalhe: "Você frita em casa" },
-  { id: "pronto", titulo: "Pronto para comer", detalhe: null },
-];
-const NOME_MODO = { congelado: "congelado", pronto: "pronto para comer" };
-const GRUPOS = [
-  { tipo: "frito", titulo: "Fritos" },
-  { tipo: "assado", titulo: "Assados" },
-  { tipo: "variado", titulo: "Variados" },
-];
 const MAX_PACOTES = 99;
 const MAX_ADICIONAL = 99;
-
-function juntarNomes(nomes) {
-  return nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes.at(-1)}`;
-}
-
-const BADGE = "inline-flex h-7 items-center rounded-md px-2 text-sm font-bold tabular-nums";
-
-// Cabeçalho de seção (fica grudado logo abaixo do título enquanto a seção é rolada).
-// `opcional`: troca o contador e o "OBRIGATÓRIO" por um selo "OPCIONAL".
-function Secao({ titulo, subtitulo, contagem, maximo, completa, opcional = false, children }) {
-  const id = useId();
-  return (
-    <section aria-labelledby={id}>
-      <div className="sticky top-14 z-10 flex items-center justify-between gap-3 border-y border-l-4 border-borda-suave border-l-vinho bg-fundo px-4 py-3">
-        <div className="min-w-0">
-          <h3 id={id} className="font-bold leading-snug text-texto">
-            {titulo}
-          </h3>
-          <p className="text-sm text-texto-suave">{subtitulo}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {!opcional && (
-            <span className={`${BADGE} ${completa ? "bg-sucesso-fundo text-sucesso" : "bg-vinho text-creme"}`}>
-              {contagem}/{maximo}
-            </span>
-          )}
-          {opcional ? (
-            <span className={`${BADGE} bg-superficie text-texto-suave ring-1 ring-borda-input`}>OPCIONAL</span>
-          ) : completa ? (
-            <span className={`${BADGE} bg-sucesso-fundo text-sucesso`}>
-              <IconeCheck className="size-4" />
-              <span className="sr-only">Completo</span>
-            </span>
-          ) : (
-            <span className={`${BADGE} bg-vinho text-creme`}>OBRIGATÓRIO</span>
-          )}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Aviso({ children }) {
-  return (
-    <p role="status" className="mx-4 my-3 flex items-start gap-2 rounded-xl bg-aviso-fundo px-3 py-2.5 text-sm font-medium text-aviso-texto">
-      <IconeAlerta className="mt-px size-5 shrink-0" />
-      <span>{children}</span>
-    </p>
-  );
-}
-
-// Linha de opção: texto à esquerda, radio/checkbox real (estilizado redondo) à direita, linha inteira clicável.
-function Opcao({ tipo, nome, checked, disabled, onChange, titulo, detalhe }) {
-  return (
-    <label
-      className={`flex min-h-14 items-center justify-between gap-3 px-4 py-3 transition ${
-        disabled ? "cursor-not-allowed text-desabilitado" : "cursor-pointer text-texto hover:bg-fundo"
-      }`}
-    >
-      <span className="min-w-0">
-        <span className="block font-medium leading-snug">{titulo}</span>
-        {detalhe && <span className={`block text-sm ${disabled ? "" : "text-texto-suave"}`}>{detalhe}</span>}
-      </span>
-      <input type={tipo} name={nome} checked={checked} disabled={disabled} onChange={onChange} className="radio" />
-    </label>
-  );
-}
 
 // Linha de adicional (ex.: molho): nome e preço da unidade à esquerda, quantidade (− n +) à direita.
 function LinhaAdicional({ produto, quantidade, aoMudar }) {
@@ -139,15 +63,17 @@ function LinhaAdicional({ produto, quantidade, aoMudar }) {
  * No site grava na sacola. Com `aoConfirmar(item, adicionais)` (painel admin), entrega o item a quem
  * chamou em vez de mexer na sacola; devolver false mostra o erro de limite de itens.
  */
-export function FormularioPacote({ pacote, sabores, adicionais, item, aoFechar, aoConfirmar }) {
+export function FormularioPacote({ pacote, sabores, adicionais, item, inicial = null, substituir = null, aoFechar, aoConfirmar }) {
   const total = pacote.salgados_a_escolher;
   const maximo = pacote.max_sabores ?? total;
   const todos = [...sabores.frito, ...sabores.assado, ...sabores.variado];
   const idsAssados = new Set(sabores.assado.map((s) => s.id));
 
   // `escolhidos` guarda só quem foi escolhido, na ordem de clique. As quantidades saem da regra fixa.
-  const [modo, setModo] = useState(item?.modo ?? null);
-  const [escolhidos, setEscolhidos] = useState(() => item?.sabores.map(({ produtoId, nome }) => ({ produtoId, nome })) ?? []);
+  // `inicial` ("Trocar para o kit"): já abre com o modo e as qualidades do "à vontade".
+  const origem = item ?? inicial;
+  const [modo, setModo] = useState(origem?.modo ?? null);
+  const [escolhidos, setEscolhidos] = useState(() => origem?.sabores.map(({ produtoId, nome }) => ({ produtoId, nome })) ?? []);
   const [pacotes, setPacotes] = useState(item?.quantidade ?? 1);
   const [observacao, setObservacao] = useState(item?.observacao ?? "");
   // Adicionais (ex.: molho) por id do produto. Vão para a sacola como linhas próprias, junto com o pacote.
@@ -217,7 +143,7 @@ export function FormularioPacote({ pacote, sabores, adicionais, item, aoFechar, 
       return;
     }
     if (item) atualizarPacote(item.chave, itemSacola);
-    else if (!adicionarPacote(itemSacola, adicionaisEscolhidos)) {
+    else if (!adicionarPacote(itemSacola, adicionaisEscolhidos, substituir)) {
       setErroSacola("Seu pedido já tem o máximo de 30 itens. Finalize ou remova algum item.");
       return;
     }
@@ -439,7 +365,7 @@ export function FormularioPacote({ pacote, sabores, adicionais, item, aoFechar, 
  * do cardápio; abre por `abrirMontador` (card do pacote ou "Editar" na sacola).
  * <dialog> com showModal: aria-modal, foco preso, Esc fecha e o foco volta para quem abriu.
  */
-export default function MontadorPacote({ pacotes, sabores, adicionais = [] }) {
+export default function MontadorPacote({ pacotes, sabores, adicionais = [], livre = null }) {
   const pedido = useMontador();
   const { itens } = useSacola();
   const dialogo = useRef(null);
@@ -450,7 +376,9 @@ export default function MontadorPacote({ pacotes, sabores, adicionais = [] }) {
     if (!pedido && d.open) d.close();
   }, [pedido]);
 
-  const pacote = pedido ? pacotes.find((p) => p.id === pedido.pacoteId) : null;
+  // "Monte do seu jeito" usa a mesma janela, com o formulário dele.
+  const ehLivre = Boolean(pedido && livre && pedido.pacoteId === livre.id);
+  const pacote = pedido && !ehLivre ? pacotes.find((p) => p.id === pedido.pacoteId) : null;
   const item = pedido?.chave ? itens.find((i) => i.chave === pedido.chave) : null;
   const fechar = () => dialogo.current?.close();
 
@@ -462,8 +390,19 @@ export default function MontadorPacote({ pacotes, sabores, adicionais = [] }) {
       onClick={(e) => e.target === dialogo.current && fechar()}
       className="sheet m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-superficie p-0 text-texto sm:m-auto sm:h-[min(90dvh,860px)] sm:max-w-xl sm:rounded-2xl"
     >
-      {pedido && pacote && (pedido.chave ? item : true) ? (
-        <FormularioPacote key={pedido.id} pacote={pacote} sabores={sabores} adicionais={adicionais} item={item} aoFechar={fechar} />
+      {ehLivre && (pedido.chave ? item : true) ? (
+        <FormularioLivre key={pedido.id} livre={livre} kits={pacotes} sabores={sabores} item={item} aoFechar={fechar} />
+      ) : pedido && pacote && (pedido.chave ? item : true) ? (
+        <FormularioPacote
+          key={pedido.id}
+          pacote={pacote}
+          sabores={sabores}
+          adicionais={adicionais}
+          item={item}
+          inicial={pedido.inicial}
+          substituir={pedido.substituir}
+          aoFechar={fechar}
+        />
       ) : (
         pedido && (
           <div className="p-6">

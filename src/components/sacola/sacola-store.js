@@ -9,6 +9,9 @@ import { dividirSabores } from "@/lib/dividirSabores";
 //   pacote: { chave, produtoId, nome, quantidade, modo: "congelado" | "pronto",
 //             sabores: [{ produtoId, nome, quantidade }], tamanho, observacao? }
 //   avulso: { chave, produtoId, nome, categoria?, quantidade }  (refrigerante ou adicional, ex.: molho)
+//   "Monte do seu jeito": igual ao pacote, com `livre: true`, `quantidade` SEMPRE 1, sem `tamanho` e o nome
+//             já com o total ("Monte do seu jeito (70 salgados)", como o banco devolve). Não muda a quantidade:
+//             para outro, o cliente monta de novo.
 //
 // `quantidade` = nº de pacotes (ou unidades do avulso). A `quantidade` de cada sabor é o TOTAL da linha
 // (já multiplicado pelo nº de pacotes), como o banco espera. Ex.: 2 pacotes de 30 com
@@ -63,10 +66,10 @@ function paraPedido({ produtoId, nome, quantidade, modo, sabores }) {
 }
 
 // O que fica guardado na sacola.
-function paraGuardar({ produtoId, nome, quantidade, modo, sabores, tamanho, observacao }) {
+function paraGuardar({ produtoId, nome, quantidade, modo, sabores, tamanho, observacao, livre }) {
   if (!modo) return { produtoId, nome, quantidade };
   const obs = (observacao ?? "").trim();
-  return { produtoId, nome, quantidade, modo, sabores, tamanho, ...(obs ? { observacao: obs } : {}) };
+  return { produtoId, nome, quantidade, modo, sabores, tamanho, ...(livre ? { livre: true } : {}), ...(obs ? { observacao: obs } : {}) };
 }
 
 /** Itens no formato do front aceito por calcularPedido/criarPedido (sem os campos locais). */
@@ -84,9 +87,10 @@ function somarAvulso(lista, { id, nome, categoria }, quantidade) {
 /**
  * Adiciona um pacote montado e, junto, os adicionais escolhidos na montagem
  * (`avulsos`: [{ produto, quantidade }]). Retorna false (sem mudar nada) se passar do máximo de linhas.
+ * `substituir`: chave de um item que sai junto (ex.: "Trocar para o kit" troca o "à vontade" pelo kit).
  */
-export function adicionarPacote(pacote, avulsos = []) {
-  let nova = [...carregar(), { ...paraGuardar(pacote), chave: novaChave() }];
+export function adicionarPacote(pacote, avulsos = [], substituir = null) {
+  let nova = [...carregar().filter((i) => i.chave !== substituir), { ...paraGuardar(pacote), chave: novaChave() }];
   for (const { produto, quantidade } of avulsos) nova = somarAvulso(nova, produto, quantidade);
   if (nova.length > LIMITE_LINHAS) return false;
   salvar(nova);
@@ -114,7 +118,7 @@ export function alterarQuantidade(chave, quantidade) {
   if (quantidade <= 0) return remover(chave);
   salvar(
     carregar().map((i) => {
-      if (i.chave !== chave) return i;
+      if (i.chave !== chave || i.livre) return i; // "à vontade" é sempre 1
       if (!i.modo) return { ...i, quantidade };
       const sabores = i.tamanho
         ? dividirSabores(i.tamanho, i.sabores, quantidade)

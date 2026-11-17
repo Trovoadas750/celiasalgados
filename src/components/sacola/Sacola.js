@@ -69,27 +69,30 @@ function LinhaSacola({ item, subtotal, calculando, aoEditar }) {
             Remover
           </button>
         </div>
-        <div className="flex items-center rounded-full bg-superficie ring-1 ring-borda-input">
-          <button
-            type="button"
-            onClick={() => alterarQuantidade(item.chave, item.quantidade - 1)}
-            className="grid size-9 place-items-center rounded-full text-ferrugem transition hover:bg-fundo"
-            aria-label={`Diminuir quantidade de ${item.nome}`}
-          >
-            <IconeMenos className="size-4" />
-          </button>
-          <span className="min-w-7 text-center text-sm font-bold tabular-nums" aria-label={`${item.quantidade} unidades`}>
-            {item.quantidade}
-          </span>
-          <button
-            type="button"
-            onClick={() => alterarQuantidade(item.chave, item.quantidade + 1)}
-            className="grid size-9 place-items-center rounded-full text-ferrugem transition hover:bg-fundo"
-            aria-label={`Aumentar quantidade de ${item.nome}`}
-          >
-            <IconeMais className="size-4" />
-          </button>
-        </div>
+        {/* "Monte do seu jeito" é sempre 1: para outro, o cliente monta de novo. */}
+        {!item.livre && (
+          <div className="flex items-center rounded-full bg-superficie ring-1 ring-borda-input">
+            <button
+              type="button"
+              onClick={() => alterarQuantidade(item.chave, item.quantidade - 1)}
+              className="grid size-9 place-items-center rounded-full text-ferrugem transition hover:bg-fundo"
+              aria-label={`Diminuir quantidade de ${item.nome}`}
+            >
+              <IconeMenos className="size-4" />
+            </button>
+            <span className="min-w-7 text-center text-sm font-bold tabular-nums" aria-label={`${item.quantidade} unidades`}>
+              {item.quantidade}
+            </span>
+            <button
+              type="button"
+              onClick={() => alterarQuantidade(item.chave, item.quantidade + 1)}
+              className="grid size-9 place-items-center rounded-full text-ferrugem transition hover:bg-fundo"
+              aria-label={`Aumentar quantidade de ${item.nome}`}
+            >
+              <IconeMais className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
     </li>
   );
@@ -203,9 +206,12 @@ export default function Sacola() {
               <footer className="space-y-3 border-t border-borda-suave bg-superficie px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
                 {erro && <AlertaErro>{erro}</AlertaErro>}
                 {avisos && !avisos.entrega_permitida && (
-                  <p className="flex items-start gap-2 rounded-xl bg-info-fundo px-3 py-2 text-sm font-medium text-info">
-                    <IconeAlerta className="mt-px size-4 shrink-0" />
-                    Pedidos acima de {avisos.limite_entrega ?? LOJA.limiteEntrega} salgados são só para retirada no local.
+                  <p role="status" className="flex items-start gap-2 rounded-xl bg-aviso-fundo px-3 py-2.5 text-sm font-bold text-aviso-texto ring-2 ring-aviso-texto">
+                    <IconeAlerta className="mt-px size-5 shrink-0" />
+                    <span>
+                      Pedidos com mais de {avisos.limite_entrega ?? LOJA.limiteEntrega} salgados são apenas para RETIRADA NO LOCAL e
+                      precisam ser AGENDADOS com pelo menos 1 dia de antecedência (a partir de amanhã).
+                    </span>
                   </p>
                 )}
                 <div className="flex items-center justify-between text-sm">

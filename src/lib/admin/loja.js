@@ -1,7 +1,9 @@
 // Leituras das telas de consulta do painel: cardápio, frete, dados da loja e administradores.
 // O painel NÃO edita cardápio, preços, horários, frete nem dados da loja: isso é feito no banco/código.
 
+import { dividirSabores } from "@/lib/dividirSabores";
 import { calcularFrete } from "@/lib/frete";
+import { dividirLivre } from "@/lib/livre";
 import { calcularPedido } from "@/lib/pedidos";
 import { chamarRotaAdmin } from "./api";
 import { checar } from "./pedidos";
@@ -20,12 +22,13 @@ export async function listarProdutosAdmin() {
       .order("ordem")
       .order("nome"),
   );
-  const grupos = { pacotes: [], sabores: [], bebidas: [], adicionais: [] };
+  const grupos = { pacotes: [], sabores: [], bebidas: [], adicionais: [], livre: [] };
   for (const p of data ?? []) {
     const produto = { ...p, preco: p.preco == null ? null : Number(p.preco), preco_so_assado: p.preco_so_assado == null ? null : Number(p.preco_so_assado) };
     if (p.categoria === "kit") grupos.pacotes.push(produto);
     else if (p.categoria === "salgado") grupos.sabores.push(produto);
     else if (p.categoria === "refrigerante") grupos.bebidas.push(produto);
+    else if (p.categoria === "livre") grupos.livre.push(produto);
     else grupos.adicionais.push(produto);
   }
   return grupos;
@@ -47,6 +50,63 @@ export async function previaPrecoSabor(sabor, pacotes) {
   }));
   const resumo = await calcularPedido(itens);
   return ativos.map((p, i) => ({ pacote: p.nome, modo, valor: Number(resumo.itens[i]?.subtotal) }));
+}
+
+/** Regras do "Monte do seu jeito" (no painel inclui o acréscimo por qualidade extra). */
+export async function buscarRegrasLivre() {
+  const { data } = checar(
+    await db()
+      .from("regras_livre")
+      .select("acrescimo_por_qualidade_pct, quantidade_minima, quantidade_maxima, minimo_qualidades, minimo_por_sabor, multiplo")
+      .eq("id", 1)
+      .maybeSingle(),
+  );
+  return data ? Object.fromEntries(Object.entries(data).map(([k, v]) => [k, Number(v)])) : null;
+}
+
+/**
+ * Prévia do "Monte do seu jeito" x kit equivalente: 30, 50 e 100 salgados com 1 a 4 qualidades
+ * fritas (congelado), tudo pelo calcular_pedido (uma consulta só). Combinações fora das regras
+ * ficam sem preço (ex.: 1 qualidade, abaixo do mínimo).
+ * @returns {Promise<{ tamanho: number, qualidades: number, livre: number | null, motivoLivre?: string,
+ *                     kit: { nome: string, valor: number } | null }[]>}
+ */
+export async function previaLivre({ livre, regras, pacotes, fritos }) {
+  const linhasPedido = [];
+  const tabela = [];
+  const disponiveis = fritos.filter((s) => s.ativo && s.vende_congelado);
+  for (const tamanho of [30, 50, 100]) {
+    const kit = pacotes.find((p) => p.ativo && p.salgados_a_escolher === tamanho);
+    for (let n = 1; n <= 4; n++) {
+      const sabores = disponiveis.slice(0, n);
+      const linha = { tamanho, qualidades: n, livre: null, kit: null };
+      if (sabores.length < n) {
+        linha.motivoLivre = "faltam qualidades fritas ativas";
+        tabela.push(linha);
+        continue;
+      }
+      const partes = dividirLivre(tamanho, n, regras);
+      if (livre.ativo && n >= regras.minimo_qualidades && n <= (livre.max_sabores ?? 10) && partes && tamanho >= regras.quantidade_minima) {
+        linha.indiceLivre = linhasPedido.length;
+        linhasPedido.push({ produtoId: livre.id, quantidade: 1, modo: "congelado", sabores: sabores.map((s, i) => ({ produtoId: s.id, quantidade: partes[i] })) });
+      } else {
+        linha.motivoLivre = n < regras.minimo_qualidades ? `mínimo de ${regras.minimo_qualidades} qualidades` : "fora das regras";
+      }
+      if (kit && n <= (kit.max_sabores ?? tamanho)) {
+        linha.indiceKit = linhasPedido.length;
+        linha.nomeKit = kit.nome;
+        linhasPedido.push({ produtoId: kit.id, quantidade: 1, modo: "congelado", sabores: dividirSabores(tamanho, sabores.map((s) => ({ produtoId: s.id })), 1) });
+      }
+      tabela.push(linha);
+    }
+  }
+  if (linhasPedido.length === 0) return tabela;
+  const resumo = await calcularPedido(linhasPedido);
+  return tabela.map(({ indiceLivre, indiceKit, nomeKit, ...linha }) => ({
+    ...linha,
+    livre: indiceLivre != null ? Number(resumo.itens[indiceLivre].subtotal) : null,
+    kit: indiceKit != null ? { nome: nomeKit, valor: Number(resumo.itens[indiceKit].subtotal) } : null,
+  }));
 }
 
 export async function listarFaixasFrete() {

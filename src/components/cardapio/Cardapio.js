@@ -40,10 +40,10 @@ function Atalhos() {
 
 // Cardápio montado a partir de `listarCardapio()` (lib/cardapio.js).
 export default function Cardapio({ cardapio }) {
-  const { pacotes, sabores, refrigerantes, adicionais } = cardapio;
+  const { pacotes, sabores, refrigerantes, adicionais, livre } = cardapio;
   const totalSabores = sabores.frito.length + sabores.assado.length + sabores.variado.length;
 
-  if (pacotes.length === 0 && totalSabores === 0 && refrigerantes.length === 0) {
+  if (pacotes.length === 0 && !livre && totalSabores === 0 && refrigerantes.length === 0) {
     return (
       <div className="mt-6 rounded-2xl bg-superficie px-4 py-10 text-center ring-1 ring-borda-suave">
         <p className="font-semibold text-texto">O cardápio está vazio no momento.</p>
@@ -58,10 +58,10 @@ export default function Cardapio({ cardapio }) {
       <SimularFrete />
       <Atalhos />
        <ModosPacote />
-      <SecaoPacotes pacotes={pacotes} />
+      <SecaoPacotes pacotes={pacotes} livre={livre} fritos={sabores.frito} />
      
       <SecaoBebidas refrigerantes={refrigerantes} />
-      <MontadorPacote pacotes={pacotes} sabores={sabores} adicionais={adicionais} />
+      <MontadorPacote pacotes={pacotes} sabores={sabores} adicionais={adicionais} livre={livre} />
     </>
   );
 }

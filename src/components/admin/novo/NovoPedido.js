@@ -156,11 +156,16 @@ export default function NovoPedido() {
           if (r.endereco) setEndereco(r.endereco);
           setPagamento({ forma: r.forma, troco: "" });
           setObservacao(r.observacao);
-          setAviso(
-            r.ignorados.length
-              ? `Copiado do pedido nº ${repetir}. Ficaram de fora (não estão mais no cardápio): ${r.ignorados.join(", ")}.`
-              : `Copiado do pedido nº ${repetir}. Confira tudo antes de lançar.`,
-          );
+          const partes = [`Copiado do pedido nº ${repetir}.`];
+          if (r.ignorados.length) partes.push(`Ficaram de fora (não estão mais no cardápio): ${r.ignorados.join(", ")}.`);
+          // "Monte do seu jeito" fora das regras atuais: avisa o motivo e abre a montagem para ajustar.
+          if (r.ajustar.length) {
+            partes.push(`O "Monte do seu jeito" precisa de ajuste: ${r.ajustar[0].problemas.join("; ")}.`);
+            setMontando({ id: `ajuste-${repetir}`, livre: true, item: r.ajustar[0].item });
+          }
+          if (r.ajustar.length > 1) partes.push(`Há mais ${r.ajustar.length - 1} "Monte do seu jeito" para montar de novo.`);
+          if (partes.length === 1) partes.push("Confira tudo antes de lançar.");
+          setAviso(partes.join(" "));
         })
         .catch((e) => {
           if (e.sessaoExpirada) sessaoExpirou();

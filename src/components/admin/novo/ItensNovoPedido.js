@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { FormularioLivre } from "@/components/cardapio/MontadorLivre";
 import { FormularioPacote } from "@/components/cardapio/MontadorPacote";
 import { MensagemErro } from "@/components/cliente/Campo";
 import { IconeLapis, IconeMais, IconeMenos } from "@/components/icones";
@@ -29,8 +30,11 @@ function somarAvulso(lista, produto, quantidade) {
   return [...lista, { chave: novaChave(), produtoId: produto.id, nome: produto.nome, categoria: produto.categoria, quantidade }];
 }
 
-/** Montador do site dentro de um <dialog>, entregando o pacote para a lista do painel. */
-function MontadorAdmin({ montando, cardapio, aoFechar, aoConfirmar }) {
+/**
+ * Montadores do site (kit ou "Monte do seu jeito") dentro de um <dialog>, entregando o item para a
+ * lista do painel. montando = { id, pacote, item, inicial?, substituir? } (kit) · { id, livre: true, item } (à vontade).
+ */
+function MontadorAdmin({ montando, cardapio, aoFechar, aoConfirmar, aoConfirmarLivre, aoTrocarParaKit }) {
   const ref = useRef(null);
   useEffect(() => {
     const d = ref.current;
@@ -46,13 +50,26 @@ function MontadorAdmin({ montando, cardapio, aoFechar, aoConfirmar }) {
       onClick={(e) => e.target === ref.current && ref.current.close()}
       className="sheet m-0 h-dvh max-h-none w-full max-w-none overflow-hidden bg-superficie p-0 text-texto sm:m-auto sm:h-[min(90dvh,860px)] sm:max-w-xl sm:rounded-2xl"
     >
-      {montando && (
+      {montando && montando.livre && cardapio.livre && (
+        <FormularioLivre
+          key={montando.id}
+          livre={cardapio.livre}
+          kits={cardapio.pacotes}
+          sabores={cardapio.sabores}
+          item={montando.item}
+          aoFechar={() => ref.current?.close()}
+          aoConfirmar={aoConfirmarLivre}
+          aoTrocarParaKit={aoTrocarParaKit}
+        />
+      )}
+      {montando && !montando.livre && (
         <FormularioPacote
           key={montando.id}
           pacote={montando.pacote}
           sabores={cardapio.sabores}
           adicionais={cardapio.adicionais}
           item={montando.item}
+          inicial={montando.inicial ?? null}
           aoFechar={() => ref.current?.close()}
           aoConfirmar={aoConfirmar}
         />
@@ -98,11 +115,29 @@ export default function ItensNovoPedido({ cardapio, itens, setItens, montando, s
 
   function confirmarPacote(item, adicionais) {
     const editando = montando?.item;
-    let lista = editando ? itens.map((i) => (i.chave === editando.chave ? { ...item, chave: editando.chave } : i)) : [...itens, { ...item, chave: novaChave() }];
+    const substituir = montando?.substituir; // "Trocar para o kit": o "à vontade" sai
+    const base = itens.filter((i) => i.chave !== substituir);
+    let lista = editando ? base.map((i) => (i.chave === editando.chave ? { ...item, chave: editando.chave } : i)) : [...base, { ...item, chave: novaChave() }];
     for (const { produto, quantidade } of adicionais) lista = somarAvulso(lista, produto, quantidade);
     if (lista.length > LIMITE_LINHAS) return false;
     setItens(lista);
     return true;
+  }
+
+  /** "Monte do seu jeito": edita (mesma chave) ou entra como novo (inclusive o rascunho do "Repetir pedido"). */
+  function confirmarLivre(item) {
+    const chave = montando?.item?.chave ?? novaChave();
+    const existe = itens.some((i) => i.chave === chave);
+    const lista = existe ? itens.map((i) => (i.chave === chave ? { ...item, chave } : i)) : [...itens, { ...item, chave }];
+    if (lista.length > LIMITE_LINHAS) return false;
+    setItens(lista);
+    return true;
+  }
+
+  /** Do "à vontade" para o kit sugerido, já com o modo e as qualidades; o "à vontade" sai ao confirmar. */
+  function trocarParaKit(kit, inicial) {
+    const chave = montando?.item?.chave ?? null;
+    setMontando({ id: novaChave(), pacote: kit, item: null, inicial, substituir: itens.some((i) => i.chave === chave) ? chave : null });
   }
 
   return (
@@ -120,6 +155,15 @@ export default function ItensNovoPedido({ cardapio, itens, setItens, montando, s
               <IconeMais className="size-4" /> {p.nome}
             </button>
           ))}
+          {cardapio.livre && (
+            <button
+              type="button"
+              onClick={() => setMontando({ id: novaChave(), livre: true, item: null })}
+              className={`${CLASSE_BOTAO_CONTORNO} min-h-12 px-4 text-[15px]`}
+            >
+              <IconeMais className="size-4" /> {cardapio.livre.nome}
+            </button>
+          )}
         </div>
       </div>
 
@@ -150,7 +194,8 @@ export default function ItensNovoPedido({ cardapio, itens, setItens, montando, s
               <li key={item.chave} className="flex items-start gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 font-bold">
-                    {item.quantidade}x {item.nome}
+                    {item.livre ? "" : `${item.quantidade}x `}
+                    {item.nome}
                     {item.modo && <BadgeModo modo={item.modo} />}
                   </p>
                   {item.modo && (
@@ -169,6 +214,7 @@ export default function ItensNovoPedido({ cardapio, itens, setItens, montando, s
                     <button
                       type="button"
                       onClick={() => {
+                        if (item.livre) return setMontando({ id: novaChave(), livre: true, item });
                         const pacote = cardapio.pacotes.find((p) => p.id === item.produtoId);
                         if (pacote) setMontando({ id: novaChave(), pacote, item });
                       }}
@@ -194,7 +240,14 @@ export default function ItensNovoPedido({ cardapio, itens, setItens, montando, s
         {erro && <MensagemErro>{erro}</MensagemErro>}
       </div>
 
-      <MontadorAdmin montando={montando} cardapio={cardapio} aoFechar={() => setMontando(null)} aoConfirmar={confirmarPacote} />
+      <MontadorAdmin
+        montando={montando}
+        cardapio={cardapio}
+        aoFechar={() => setMontando(null)}
+        aoConfirmar={confirmarPacote}
+        aoConfirmarLivre={confirmarLivre}
+        aoTrocarParaKit={trocarParaKit}
+      />
     </div>
   );
 }
