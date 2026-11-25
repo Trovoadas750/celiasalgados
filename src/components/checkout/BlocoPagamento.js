@@ -2,7 +2,7 @@
 
 import Campo, { MensagemErro } from "@/components/cliente/Campo";
 import { formatarPreco } from "@/lib/formatar";
-import { FORMAS_PAGAMENTO, FORMAS_PAGAMENTO_AGENDAMENTO } from "@/lib/pagamento";
+import { FORMAS_PAGAMENTO_AGENDAMENTO, formaPermitida, formasPermitidas } from "@/lib/pagamento";
 import { OpcaoRadio } from "./BlocoEntrega";
 
 // "100" / "100,50" / "1.000,00" / "100.50" -> número ; vazio -> null ; inválido -> NaN
@@ -21,7 +21,8 @@ export function formaAceitaNoAgendamento(forma) {
   return FORMAS_PAGAMENTO_AGENDAMENTO.some((f) => f.id === forma);
 }
 
-export function validarPagamento({ forma, troco }, totalEstimado, agendado = false) {
+export function validarPagamento({ forma, troco }, totalEstimado, agendado = false, entrega = false) {
+  if (entrega) return formaPermitida(forma, { agendado, entrega }) ? {} : { forma: "Para entrega, o pagamento é só por Pix." };
   if (agendado) return formaAceitaNoAgendamento(forma) ? {} : { forma: "Escolha Pix ou cartão de crédito." };
   if (!forma) return { forma: "Escolha a forma de pagamento." };
   if (forma !== "dinheiro") return {};
@@ -33,19 +34,26 @@ export function validarPagamento({ forma, troco }, totalEstimado, agendado = fal
 }
 
 /**
- * Forma de pagamento.
+ * Forma de pagamento. ENTREGA: só Pix (já vem marcado).
  * - Agendado: "Como prefere pagar?" Pix ou cartão de crédito (a loja envia a chave/link pelo WhatsApp).
  * - Agora: Pix, dinheiro (com troco) ou cartão na maquininha, pagos na entrega/retirada.
  */
-export default function BlocoPagamento({ valores, setValores, erros, momento = "na entrega", agendado = false }) {
-  const formas = agendado ? FORMAS_PAGAMENTO_AGENDAMENTO : FORMAS_PAGAMENTO;
+export default function BlocoPagamento({ valores, setValores, erros, momento = "na entrega", agendado = false, entrega = false }) {
+  const formas = formasPermitidas({ agendado, entrega });
   return (
     <fieldset className="space-y-2" data-erro={erros.forma ? true : undefined}>
       <legend className="mb-2 text-[15px] font-bold">Como prefere pagar?</legend>
-      {agendado && (
+      {entrega ? (
         <p className="pb-1 text-sm text-texto-suave">
-          Agendamentos são pagos antes, para confirmar o horário. A loja envia a chave Pix ou o link do cartão pelo WhatsApp.
+          Para entrega, o pagamento é só por Pix.
+          {agendado && " Agendamentos são pagos antes, para confirmar o horário: a loja envia a chave Pix pelo WhatsApp."}
         </p>
+      ) : (
+        agendado && (
+          <p className="pb-1 text-sm text-texto-suave">
+            Agendamentos são pagos antes, para confirmar o horário. A loja envia a chave Pix ou o link do cartão pelo WhatsApp.
+          </p>
+        )
       )}
       {formas.map((f) => (
         <OpcaoRadio
@@ -59,7 +67,7 @@ export default function BlocoPagamento({ valores, setValores, erros, momento = "
         />
       ))}
       {erros.forma && <MensagemErro>{erros.forma}</MensagemErro>}
-      {!agendado && valores.forma === "dinheiro" && (
+      {!agendado && !entrega && valores.forma === "dinheiro" && (
         <Campo
           rotulo="Troco para quanto?"
           opcional

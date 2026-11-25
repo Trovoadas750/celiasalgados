@@ -178,8 +178,9 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   const vaiAgendar = exigeAgendamento || quando.tipo === "agendar";
   const precisaConta = vaiAgendar && !logado;
 
-  // Agendamento só aceita Pix ou cartão: ao passar para agendado, desmarca dinheiro/troco.
-  if (vaiAgendar && pagamento.forma && !formaAceitaNoAgendamento(pagamento.forma)) setPagamento({ forma: "", troco: "" });
+  // Entrega: só Pix (já marcado). Agendamento só aceita Pix ou cartão: desmarca dinheiro/troco.
+  if (comEntrega && pagamento.forma !== "pix") setPagamento({ forma: "pix", troco: "" });
+  else if (vaiAgendar && pagamento.forma && !formaAceitaNoAgendamento(pagamento.forma)) setPagamento({ forma: "", troco: "" });
 
   // Abre o login/cadastro na seção "Seus dados" (sem trocar de página).
   function abrirConta(aba) {
@@ -220,7 +221,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
       ...(comEntrega ? validar(endereco, ["cep", "rua", "vila", "numero", "ponto_referencia"]) : {}),
       ...validarAgendamento(quando, exigeAgendamento, limites),
       // Troco comparado com o total COM frete (como o banco faz). Agendado: só Pix ou cartão.
-      ...validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0, vaiAgendar),
+      ...validarPagamento(pagamento, resumoFinal?.total ?? resumo?.total ?? 0, vaiAgendar, comEntrega),
       ...validar({ observacao }, ["observacao"]),
       ...validarObservacaoTotal(),
     };
@@ -382,6 +383,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
         <Secao numero={4} titulo="Pagamento">
           <BlocoPagamento
             agendado={vaiAgendar}
+            entrega={comEntrega}
             valores={pagamento}
             setValores={semErroAoMudar(pagamento, setPagamento)}
             erros={erros}

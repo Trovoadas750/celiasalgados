@@ -197,6 +197,8 @@ export default function NovoPedido() {
 
   // Valores: só do banco (calcular_pedido), com frete quando é entrega.
   const comEntrega = recebimento === "entrega";
+  // Entrega: só Pix (já marcado), como no site.
+  if (comEntrega && pagamento.forma !== "pix") setPagamento({ forma: "pix", troco: "" });
   const itensPedido = itens.length ? itensParaPedido(itens) : null;
   const { resumo, erro: erroCalculo, calculando } = useCalcularPedido(itensPedido);
   const frete = useFreteEntrega(comEntrega, endereco);
@@ -223,7 +225,7 @@ export default function NovoPedido() {
     const novos = {
       ...validar(cliente, ["nome", "sobrenome", "telefone"]),
       ...(comEntrega ? validar(endereco, ["cep", "rua", "vila", "numero", "ponto_referencia"]) : {}),
-      ...validarPagamento(pagamento, resumoFinal?.total ?? 0, false),
+      ...validarPagamento(pagamento, resumoFinal?.total ?? 0, false, comEntrega),
       ...validar({ observacao }, ["observacao"]),
     };
     if (itens.length === 0) novos.itens = "Adicione pelo menos um item.";
@@ -257,7 +259,7 @@ export default function NovoPedido() {
       itens: itensPedido,
       agendadoPara: quando.tipo === "agendar" ? quando.inicio : null,
       formaPagamento: pagamento.forma,
-      trocoPara: pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
+      trocoPara: !comEntrega && pagamento.forma === "dinheiro" ? lerValor(pagamento.troco) : null,
       observacao: observacaoFinal,
     };
     try {
@@ -497,6 +499,7 @@ export default function NovoPedido() {
       <Secao numero={5} titulo="Pagamento e observação">
         <div className="space-y-4">
           <BlocoPagamento
+            entrega={comEntrega}
             valores={pagamento}
             setValores={(v) => {
               setPagamento(v);

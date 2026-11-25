@@ -27,6 +27,21 @@ export const FORMAS_PAGAMENTO_AGENDAMENTO = [
 ];
 
 /**
+ * Formas aceitas no pedido:
+ *  - ENTREGA: só Pix (agora ou agendado);
+ *  - retirada agendada: Pix ou cartão de crédito (pago antes, pelo WhatsApp);
+ *  - retirada agora: Pix, dinheiro ou cartão na maquininha.
+ */
+export function formasPermitidas({ agendado = false, entrega = false } = {}) {
+  if (entrega) return [agendado ? FORMAS_PAGAMENTO_AGENDAMENTO[0] : FORMAS_PAGAMENTO[0]];
+  return agendado ? FORMAS_PAGAMENTO_AGENDAMENTO : FORMAS_PAGAMENTO;
+}
+
+export function formaPermitida(forma, opcoes) {
+  return formasPermitidas(opcoes).some((f) => f.id === forma);
+}
+
+/**
  * Link do WhatsApp da loja para pagar o agendamento.
  * @param {{ numero: number, total: number, forma?: string | null, agendadoPara?: string | null, expiraEm?: string | null }} pedido
  */
