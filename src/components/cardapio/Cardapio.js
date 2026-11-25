@@ -1,4 +1,5 @@
 import { IconeMotoboy } from "@/components/icones";
+import { textoLimiteEntrega } from "@/lib/loja";
 import ModosPacote from "./ModosPacote";
 import MontadorPacote from "./MontadorPacote";
 import SecaoBebidas from "./SecaoBebidas";
@@ -14,7 +15,7 @@ export function AvisoEntrega() {
   return (
     <p className="mt-4 flex items-start gap-2.5 rounded-xl bg-info-fundo px-3 py-2.5 text-sm font-medium text-info">
       <IconeMotoboy className="mt-0.5 size-5 shrink-0" />
-      <span>Entregamos até 1 cento (100 salgados) por pedido. Acima disso, retirada no local.</span>
+      <span>Entregamos até {textoLimiteEntrega()} por pedido. Acima disso, retirada no local.</span>
     </p>
   );
 }

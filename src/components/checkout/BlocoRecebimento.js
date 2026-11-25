@@ -4,6 +4,7 @@ import { MensagemErro } from "@/components/cliente/Campo";
 import { IconeAlerta, IconeCheck, IconeMotoboy, IconeRetirada } from "@/components/icones";
 import { TIPOS_RECEBIMENTO } from "@/lib/entrega";
 import { useEnderecoLoja } from "@/lib/configLoja";
+import { textoLimiteEntrega } from "@/lib/loja";
 import FormEndereco from "./FormEndereco";
 import ResumoFrete from "./ResumoFrete";
 
@@ -94,7 +95,7 @@ export default function BlocoRecebimento({
           <p className="flex items-start gap-2 font-medium">
             <IconeAlerta className="mt-px size-5 shrink-0" />
             <span>
-              A entrega só é possível para pedidos de até {limiteEntrega} salgados (1 cento). Seu pedido tem {totalSalgados}{" "}
+              A entrega só é possível para pedidos de até {textoLimiteEntrega(limiteEntrega)}. Seu pedido tem {totalSalgados}{" "}
               salgados: escolha retirada no local ou diminua a quantidade.
             </span>
           </p>

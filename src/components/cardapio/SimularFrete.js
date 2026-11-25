@@ -8,6 +8,7 @@ import { IconeAlerta, IconeCheck, IconeFechar, IconeMotoboy, IconeWhatsappOficia
 import { lerUltimoEndereco, salvarUltimoEndereco } from "@/lib/armazenamento-local";
 import { calcularFrete } from "@/lib/frete";
 import { formatarPreco } from "@/lib/formatar";
+import { LOJA } from "@/lib/loja";
 import { linkWhatsappLoja, mensagemCombinarEntrega } from "@/lib/mensagemWhatsapp";
 import { temErros, validar } from "@/lib/validacao";
 
@@ -149,7 +150,7 @@ export default function SimularFrete() {
             )}
           </div>
 
-          <p className="text-sm text-texto-suave">Pedidos acima de 100 salgados são só para retirada no local.</p>
+          <p className="text-sm text-texto-suave">Pedidos acima de {LOJA.limiteEntrega} salgados são só para retirada no local.</p>
           <CreditoGeoapify />
         </form>
       </dialog>

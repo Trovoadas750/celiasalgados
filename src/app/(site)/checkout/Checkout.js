@@ -148,7 +148,7 @@ function FormularioCheckout({ itens, resumo, calculando, erroCalculo, aoConfirma
   const lojaFechada = resumo?.loja_aberta === false;
   if (lojaFechada && quando.tipo === "agora") setQuando({ ...quando, tipo: "agendar" });
 
-  // Entrega não permitida (mais de 100 salgados): marca retirada sozinho e avisa.
+  // Entrega não permitida (acima do limite_entrega do banco): marca retirada sozinho e avisa.
   if (resumo && !resumo.entrega_permitida && recebimento !== "retirada") {
     setRecebimento("retirada");
     setTrocadoAuto(true);

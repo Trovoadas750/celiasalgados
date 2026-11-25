@@ -15,10 +15,10 @@ export const LOJA = {
 
   // Endereço da loja (retirada): vem do banco, tabela config_loja (lib/configLoja.js).
 
-  // Entrega só até 100 salgados (1 cento) no pedido inteiro; acima disso, só retirada.
+  // Entrega só até 300 salgados (3 centos) no pedido inteiro; acima disso, só retirada.
   // Serve para textos e avisos na tela. Quem decide de fato é o banco
   // (`limite_entrega` / `entrega_permitida` no retorno de `calcular_pedido`).
-  limiteEntrega: 100,
+  limiteEntrega: 300,
 };
 
 /**
@@ -29,6 +29,13 @@ export function enderecoDoSite() {
   const configurado = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim().replace(/\/+$/, "");
   if (configurado) return configurado;
   return typeof window === "undefined" ? "" : window.location.origin;
+}
+
+/** 300 -> "300 salgados (3 centos)"; 100 -> "100 salgados (1 cento)". Para os textos do limite de entrega. */
+export function textoLimiteEntrega(limite = LOJA.limiteEntrega) {
+  const centos = limite / 100;
+  if (!Number.isInteger(centos)) return `${limite} salgados`;
+  return `${limite} salgados (${centos} ${centos === 1 ? "cento" : "centos"})`;
 }
 
 // Redes sociais na ordem em que aparecem no site. Não existe Facebook.

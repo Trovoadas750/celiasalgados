@@ -126,7 +126,7 @@ export function FormularioLivre({ livre, kits, sabores, item = null, aoFechar, a
   const linhaPrevia = preco.previa && preco.previa.itens ? preco.previa.itens[0] : null; // prévia enquanto calcula
   const subtotal = linhaBanco ? linhaBanco.subtotal : linhaPrevia ? linhaPrevia.subtotal : null;
 
-  // Mais de 100 salgados vale para o CARRINHO inteiro (kits + "à vontade"): soma no banco.
+  // O limite de entrega vale para o CARRINHO inteiro (kits + "à vontade"): soma no banco.
   const { itens: sacola } = useSacola();
   const outros = aoConfirmar ? [] : sacola.filter((i) => i.chave !== chaveItem);
   const carrinho = useCalcularPedido(itemPedido && outros.length ? [...itensParaPedido(outros), itemPedido] : null, 600);
